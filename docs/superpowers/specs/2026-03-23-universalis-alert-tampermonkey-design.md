@@ -37,7 +37,7 @@ Required `@grant` and `@match` declarations:
 
 `GM_getValue`/`GM_setValue` are used for webhook persistence. Without the `@grant` declarations, these functions are undefined at runtime.
 
-The `@match` pattern `https://universalis.app/market/*` intentionally matches only direct item pages (e.g., `/market/44015`). Sub-paths such as `/market/44015/history` are excluded; this is the desired scope.
+The `@match` pattern `https://universalis.app/market/*` matches any path under `/market/`, including potential sub-paths. A runtime guard at injection time checks that `location.pathname.split('/').length === 3` (i.e., exactly `/market/{id}`) and returns early otherwise.
 
 ### Sections
 
@@ -59,6 +59,8 @@ The `@match` pattern `https://universalis.app/market/*` intentionally matches on
 | `DELETE` | `/api/web/alerts/{alertId}` | Delete one alert |
 
 No `PATCH`/`PUT` exists. Edit = delete affected alerts + create new ones.
+
+**Error handling:** if `GET /api/web/alerts` fails (network error, 4xx, 5xx), the modal displays an inline error ("Failed to load existing alerts — check your connection") and the Save button is disabled. On the alerts page, a full-width error message is shown in place of the panel.
 
 ### Alert POST Body
 
@@ -106,13 +108,15 @@ Individual API alerts are grouped into **logical alert groups**:
 
 **Canonical trigger key order:** `filters`, `mapper`, `reducer`, `comparison`. Any alert with trigger keys outside this set is treated as ungroupable and displayed as a standalone single-world group rather than merged or dropped.
 
-**The canonical trigger normalization is the single source of truth for equality.** It is used consistently in both the grouping algorithm and in the save logic when comparing the new form state to existing alerts.
+**The canonical trigger normalization is the single source of truth for grouping.** The save logic uses a broader "alert needs update" check that also includes `name`: if only the name changed (trigger unchanged, world already covered), the alert is still re-POSTed and the old one deleted so the new name is applied.
+
+**`discordWebhook` is not part of the grouping key.** If alerts in the same group were created with different webhooks (e.g., via the native UI), they will be merged into one group and saved with the single webhook from the modal. This is expected behavior and acceptable for the single-user use case.
 
 **Multiple distinct rules for the same item** (e.g., price < 130 and price < 200) produce separate groups and appear as separate rows on the alerts page.
 
 ### 陸行鳥 DC World IDs
 
-IDs sourced from `GET https://universalis.app/api/v3/game/data-centers`. Verify against this endpoint before shipping; Square Enix can reassign IDs during data center reorganizations.
+IDs sourced from `GET https://universalis.app/api/v3/game/data-centers`. **Pre-ship checklist item:** verify these IDs against the live endpoint before first release; Square Enix can reassign IDs during data center reorganizations.
 
 | World | ID |
 |---|---|
@@ -173,7 +177,7 @@ For each world in 陸行鳥 DC:
 ### Injection Readiness
 
 1. `MutationObserver` on `document.body` detects Next.js client-side navigation to `/account/alerts`
-2. Before doing anything, check whether the custom panel element (identified by a stable `id`, e.g. `univ-alert-panel`) already exists in the DOM. If it does, skip injection entirely — this prevents double-injection on React re-renders or repeated navigation to the same route.
+2. If the custom panel element (`id="univ-alert-panel"`) already exists in the DOM (user re-navigated to this page), remove it and re-run injection from scratch to ensure fresh data.
 3. Wait for at least one `a[href^="/market/"]` anchor to appear in the DOM — the deterministic signal that the native React list has rendered item data. Native content is **not** hidden at this point.
 4. If no such anchor appears within 10 seconds, disconnect the observer and leave the native page intact (user has no alerts).
 5. Walk the native DOM: collect `{ itemId → itemName }` — item ID from the `href` path, item name from the anchor's text content (already rendered in the user's language — no extra API calls needed).
