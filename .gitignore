@@ -1,6 +1,9 @@
 # Brainstorming / visual companion sessions
 .superpowers/
 
+# Claude Code — machine-local settings (contains absolute paths)
+.claude/settings.local.json
+
 # macOS
 .DS_Store
 

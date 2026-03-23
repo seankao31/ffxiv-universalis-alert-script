@@ -26,16 +26,18 @@ Single `.user.js` file, organized into logical sections. No build step — plain
 
 ### TamperMonkey Header
 
-Required `@grant` declarations:
+Required `@grant` and `@match` declarations:
 
 ```js
-// @grant GM_getValue
-// @grant GM_setValue
 // @match  https://universalis.app/market/*
 // @match  https://universalis.app/account/alerts
+// @grant  GM_getValue
+// @grant  GM_setValue
 ```
 
 `GM_getValue`/`GM_setValue` are used for webhook persistence. Without the `@grant` declarations, these functions are undefined at runtime.
+
+The `@match` pattern `https://universalis.app/market/*` intentionally matches only direct item pages (e.g., `/market/44015`). Sub-paths such as `/market/44015/history` are excluded; this is the desired scope.
 
 ### Sections
 
@@ -100,11 +102,11 @@ Individual API alerts are grouped into **logical alert groups**:
 }
 ```
 
-**Grouping rule:** alerts with identical `(itemId, trigger)` — differing only in `worldId` or `name` — belong to the same logical group. The `name` field is excluded from the equality key because it is a user-editable label; minor name differences (e.g., trailing spaces, manual edits) should not split a group. The group's `name` is taken from the first alert in the group. Trigger equality is determined by normalizing the trigger object to a canonical key order before JSON stringification.
+**Grouping rule:** alerts with identical `(itemId, trigger)` — differing only in `worldId` or `name` — belong to the same logical group. The `name` field is excluded from the equality key because it is a user-editable label; minor name differences should not split a group. The group's `name` is taken from the first alert in the group. Trigger equality is determined by normalizing the trigger object to a canonical key order before JSON stringification.
 
-**Canonical trigger key order:** `filters`, `mapper`, `reducer`, `comparison`.
+**Canonical trigger key order:** `filters`, `mapper`, `reducer`, `comparison`. Any alert with trigger keys outside this set is treated as ungroupable and displayed as a standalone single-world group rather than merged or dropped.
 
-**Multiple distinct rules for the same item** (e.g., price < 130 and price < 200) are supported — they produce separate groups and appear as separate rows on the alerts page.
+**Multiple distinct rules for the same item** (e.g., price < 130 and price < 200) produce separate groups and appear as separate rows on the alerts page.
 
 ### 陸行鳥 DC World IDs
 
@@ -127,7 +129,7 @@ IDs sourced from `GET https://universalis.app/api/v3/game/data-centers`. Verify 
 
 ### Injection Readiness
 
-The market page is React-rendered. The script waits for the item name heading (an `h1` or equivalent prominent heading containing the item name) to appear in the DOM before attempting to locate the native button or read the item name. A `MutationObserver` on `document.body` triggers this check.
+The market page is React-rendered. The script waits for the item name heading to appear in the DOM before attempting to locate the native button or read the item name. A `MutationObserver` on `document.body` triggers this check.
 
 ### Injection
 
@@ -139,18 +141,20 @@ The market page is React-rendered. The script waits for the item name heading (a
 
 On button click:
 1. Fetch fresh alert state via `GET /api/web/alerts`, filter to current `itemId`
-2. Read item name from page DOM (already rendered in the user's configured language)
-3. Open modal with fields:
-   - **Alert name** — pre-filled with item name
-   - **Discord webhook** — auto-populated (see Webhook section below)
+2. Group existing alerts for this item into logical groups
+3. Read item name from page DOM
+4. Open modal pre-populated from the **first** logical group found for this item (most common case: zero or one group). If multiple groups exist for this item, the market page modal shows the first group's rule and worlds pre-populated. The alerts page is the correct place to manage multiple groups per item.
+5. Modal fields:
+   - **Alert name** — pre-filled with existing group name, or item name if no group exists
+   - **Discord webhook** — auto-populated (see Webhook section below); Save is disabled until a non-empty webhook is provided
    - **Trigger condition** — metric dropdown (Price Per Unit / Quantity / Total), comparator (< / >), value input
    - **HQ only** — checkbox
-   - **Worlds** — one checkbox per 陸行鳥 world; pre-checked for worlds that already have an active alert for this item; active worlds highlighted in blue
+   - **Worlds** — one checkbox per 陸行鳥 world; pre-checked for worlds in the pre-populated group; active worlds highlighted in blue
    - **Select All / Clear** buttons
 
 ### Save Logic
 
-To prevent data loss on partial failure: all `POST` requests are issued first. `DELETE` requests are only sent after **all** `POST` requests succeed. If any `POST` fails, no deletions are performed and an error message is shown listing the affected worlds. The user can retry; any duplicate alerts created in a failure scenario are cleaned up on the next successful save.
+To prevent data loss on partial failure: all `POST` requests are issued first. `DELETE` requests are only sent after **all** `POST` requests succeed. If any `POST` fails, no deletions are performed and an error message is shown listing the affected worlds. Any duplicate alerts created in a failure scenario are cleaned up on the next successful save.
 
 For each world in 陸行鳥 DC:
 - If **newly checked** and no existing alert → `POST` new alert
@@ -165,9 +169,9 @@ For each world in 陸行鳥 DC:
 ### Injection Readiness
 
 1. `MutationObserver` on `document.body` detects Next.js client-side navigation to `/account/alerts`
-2. Wait for at least one `a[href^="/market/"]` anchor to appear in the DOM — this is the deterministic signal that the native React list has rendered item data
-3. Walk the native DOM: collect `{ itemId → itemName }` — item ID from the `href` path, item name from the anchor's text content (already rendered in the user's language — no extra API calls needed)
-4. If scraping yields zero anchors (user has no alerts), skip injection and leave the native page intact
+2. Wait for at least one `a[href^="/market/"]` anchor to appear in the DOM — the deterministic signal that the native React list has rendered item data
+3. If no such anchor appears within 10 seconds, disconnect the observer and leave the native page intact (user has no alerts)
+4. Walk the native DOM: collect `{ itemId → itemName }` — item ID from the `href` path, item name from the anchor's text content (already rendered in the user's language — no extra API calls needed)
 5. Hide native content, inject enhanced panel
 
 **Item name fallback:** any alert whose `itemId` was not found during DOM scraping is displayed as `"Item #44015"` in the panel.
@@ -183,7 +187,7 @@ Table layout, one row per logical alert group:
 | Worlds | Pill tags for each world covered |
 | Actions | Edit button, Delete button |
 
-- **Edit** — re-fetches `GET /api/web/alerts` on open to get fresh state (avoids stale in-memory edits). Opens the same Modal pre-populated with the group's current values. Uses the same POST-first, DELETE-after save logic as the market page modal.
+- **Edit** — re-fetches `GET /api/web/alerts` on open to get fresh state. Opens the same Modal pre-populated with the group's current values. On save, if the trigger has changed, all `alertId`s in the original group are treated as "old" and are deleted after all POSTs for the new configuration succeed. Uses the same POST-first, DELETE-after logic as the market page.
 - **Delete** — deletes all `alertId`s in the group in parallel, then removes the row.
 
 ---
@@ -196,6 +200,8 @@ Treated as a global setting shared across all alerts. The `GET /api/web/alerts` 
 1. Webhook found in existing alerts for this item (read from `GET /api/web/alerts` response field `discordWebhook`)
 2. `GM_getValue('discordWebhook')` — last used value, persisted by TamperMonkey
 3. Empty — user enters manually
+
+**Validation:** the Save button is disabled until the webhook field contains a non-empty value.
 
 **On save:** always write the current webhook value to `GM_setValue('discordWebhook')`.
 
