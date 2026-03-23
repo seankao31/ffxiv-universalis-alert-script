@@ -1,9 +1,15 @@
 const AlertsPage = (() => {
-  const _API = () => (typeof API !== 'undefined' ? API : require('./api'));
-  const _Modal = () => (typeof Modal !== 'undefined' ? Modal : require('./modal'));
-  const _Grouping = () => (typeof Grouping !== 'undefined' ? Grouping : require('./grouping'));
-  const _SaveOps = () => (typeof SaveOps !== 'undefined' ? SaveOps : require('./save-ops'));
-  const _WorldMap = () => (typeof WorldMap !== 'undefined' ? WorldMap : require('./worldmap'));
+  const _apiModule = typeof module !== 'undefined' ? require('./api') : null;
+  const _modalModule = typeof module !== 'undefined' ? require('./modal') : null;
+  const _groupingModule = typeof module !== 'undefined' ? require('./grouping') : null;
+  const _saveOpsModule = typeof module !== 'undefined' ? require('./save-ops') : null;
+  const _worldMapModule = typeof module !== 'undefined' ? require('./worldmap') : null;
+
+  function _API() { return typeof API !== 'undefined' ? API : _apiModule; }
+  function _Modal() { return typeof Modal !== 'undefined' ? Modal : _modalModule; }
+  function _Grouping() { return typeof Grouping !== 'undefined' ? Grouping : _groupingModule; }
+  function _SaveOps() { return typeof SaveOps !== 'undefined' ? SaveOps : _saveOpsModule; }
+  function _WorldMap() { return typeof WorldMap !== 'undefined' ? WorldMap : _worldMapModule; }
 
   function scrapeItemNames() {
     const map = new Map();
