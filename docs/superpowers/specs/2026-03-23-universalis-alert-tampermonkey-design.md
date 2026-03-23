@@ -102,9 +102,11 @@ Individual API alerts are grouped into **logical alert groups**:
 }
 ```
 
-**Grouping rule:** alerts with identical `(itemId, trigger)` — differing only in `worldId` or `name` — belong to the same logical group. The `name` field is excluded from the equality key because it is a user-editable label; minor name differences should not split a group. The group's `name` is taken from the first alert in the group. Trigger equality is determined by normalizing the trigger object to a canonical key order before JSON stringification.
+**Grouping rule:** alerts with identical `(itemId, trigger)` — differing only in `worldId` or `name` — belong to the same logical group. Both `itemId` and the normalized trigger are part of the equality key; `name` is excluded because it is a user-editable label and minor differences should not split a group. The group's `name` is taken from the first alert in the group. Trigger equality is determined by normalizing the trigger object to a canonical key order before JSON stringification.
 
 **Canonical trigger key order:** `filters`, `mapper`, `reducer`, `comparison`. Any alert with trigger keys outside this set is treated as ungroupable and displayed as a standalone single-world group rather than merged or dropped.
+
+**The canonical trigger normalization is the single source of truth for equality.** It is used consistently in both the grouping algorithm and in the save logic when comparing the new form state to existing alerts.
 
 **Multiple distinct rules for the same item** (e.g., price < 130 and price < 200) produce separate groups and appear as separate rows on the alerts page.
 
@@ -143,7 +145,7 @@ On button click:
 1. Fetch fresh alert state via `GET /api/web/alerts`, filter to current `itemId`
 2. Group existing alerts for this item into logical groups
 3. Read item name from page DOM
-4. Open modal pre-populated from the **first** logical group found for this item (most common case: zero or one group). If multiple groups exist for this item, the market page modal shows the first group's rule and worlds pre-populated. The alerts page is the correct place to manage multiple groups per item.
+4. Open modal pre-populated from the **first** logical group found for this item (most common case: zero or one group). If multiple groups exist for this item, the market page modal shows the first group's rule and worlds pre-populated, and a notice is shown: "Multiple alert rules exist for this item. Editing here will only affect this rule. Use the Alerts page to manage all rules." The alerts page is the correct place to manage multiple groups per item.
 5. Modal fields:
    - **Alert name** — pre-filled with existing group name, or item name if no group exists
    - **Discord webhook** — auto-populated (see Webhook section below); Save is disabled until a non-empty webhook is provided
@@ -156,11 +158,13 @@ On button click:
 
 To prevent data loss on partial failure: all `POST` requests are issued first. `DELETE` requests are only sent after **all** `POST` requests succeed. If any `POST` fails, no deletions are performed and an error message is shown listing the affected worlds. Any duplicate alerts created in a failure scenario are cleaned up on the next successful save.
 
+The save operates only on the pre-populated group (identified by its normalized trigger). Alerts belonging to other groups for the same item are left untouched.
+
 For each world in 陸行鳥 DC:
-- If **newly checked** and no existing alert → `POST` new alert
-- If **unchecked** and had existing alert → `DELETE` that alert (only after all POSTs succeed)
-- If **checked** and already has identical alert → skip (no-op)
-- If **checked** and has an alert with different rule → `POST` new alert; if all POSTs succeed, `DELETE` old alert
+- If **newly checked** and no existing alert in this group → `POST` new alert
+- If **unchecked** and had an existing alert in this group → `DELETE` that alert (only after all POSTs succeed)
+- If **checked** and already has an identical alert in this group → skip (no-op)
+- If **checked** and has an alert in this group with a different rule → `POST` new alert; if all POSTs succeed, `DELETE` old alert
 
 ---
 
@@ -169,10 +173,11 @@ For each world in 陸行鳥 DC:
 ### Injection Readiness
 
 1. `MutationObserver` on `document.body` detects Next.js client-side navigation to `/account/alerts`
-2. Wait for at least one `a[href^="/market/"]` anchor to appear in the DOM — the deterministic signal that the native React list has rendered item data
-3. If no such anchor appears within 10 seconds, disconnect the observer and leave the native page intact (user has no alerts)
-4. Walk the native DOM: collect `{ itemId → itemName }` — item ID from the `href` path, item name from the anchor's text content (already rendered in the user's language — no extra API calls needed)
-5. Hide native content, inject enhanced panel
+2. Before doing anything, check whether the custom panel element (identified by a stable `id`, e.g. `univ-alert-panel`) already exists in the DOM. If it does, skip injection entirely — this prevents double-injection on React re-renders or repeated navigation to the same route.
+3. Wait for at least one `a[href^="/market/"]` anchor to appear in the DOM — the deterministic signal that the native React list has rendered item data. Native content is **not** hidden at this point.
+4. If no such anchor appears within 10 seconds, disconnect the observer and leave the native page intact (user has no alerts).
+5. Walk the native DOM: collect `{ itemId → itemName }` — item ID from the `href` path, item name from the anchor's text content (already rendered in the user's language — no extra API calls needed).
+6. Hide native content, inject enhanced panel.
 
 **Item name fallback:** any alert whose `itemId` was not found during DOM scraping is displayed as `"Item #44015"` in the panel.
 
@@ -201,7 +206,7 @@ Treated as a global setting shared across all alerts. The `GET /api/web/alerts` 
 2. `GM_getValue('discordWebhook')` — last used value, persisted by TamperMonkey
 3. Empty — user enters manually
 
-**Validation:** the Save button is disabled until the webhook field contains a non-empty value.
+**Validation:** the Save button is disabled until the webhook field contains a non-empty value. URL format validation is out of scope — a non-empty string is sufficient.
 
 **On save:** always write the current webhook value to `GM_setValue('discordWebhook')`.
 
