@@ -1,9 +1,8 @@
 const SaveOps = (() => {
-  // Requires: Grouping (for normalizeTrigger), API, WorldMap — injected via globals in TM context
+  // Requires: Grouping (for normalizeTrigger), API — injected via globals in TM context
   // In test context, required via module.exports
   const _Grouping = typeof Grouping !== 'undefined' ? Grouping : require('./grouping');
   const _API = typeof API !== 'undefined' ? API : require('./api');
-  const _WorldMap = typeof WorldMap !== 'undefined' ? WorldMap : require('./worldmap');
 
   /**
    * Pure function. Returns { postsNeeded, deletesAfterSuccess }.
@@ -76,7 +75,11 @@ const SaveOps = (() => {
     }
 
     if (ops.deletesAfterSuccess.length > 0) {
-      await Promise.all(ops.deletesAfterSuccess.map(id => _API.deleteAlert(id)));
+      const deleteResults = await Promise.allSettled(ops.deletesAfterSuccess.map(id => _API.deleteAlert(id)));
+      const deleteFailures = deleteResults.filter(r => r.status === 'rejected');
+      if (deleteFailures.length > 0) {
+        throw new Error(`Failed to delete ${deleteFailures.length} alert(s). Some alerts may need manual cleanup.`);
+      }
     }
   }
 
