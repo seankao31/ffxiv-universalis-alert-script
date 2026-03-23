@@ -27,6 +27,7 @@ const Grouping = (() => {
         groups.set(key, {
           itemId: alert.itemId,
           name: alert.name,
+          discordWebhook: alert.discordWebhook || '',
           trigger: alert.trigger,
           worlds: [],
         });

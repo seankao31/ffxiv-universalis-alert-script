@@ -92,4 +92,10 @@ describe('deleteGroup', () => {
     expect(API.deleteAlert).toHaveBeenCalledWith('a1');
     expect(API.deleteAlert).toHaveBeenCalledWith('a2');
   });
+
+  test('throws if any deleteAlert fails', async () => {
+    API.deleteAlert.mockResolvedValueOnce().mockRejectedValueOnce(new Error('404'));
+    const group = { worlds: [{ alertId: 'a1' }, { alertId: 'a2' }] };
+    await expect(AlertsPage.deleteGroup(group)).rejects.toThrow('Failed to delete 1 alert');
+  });
 });

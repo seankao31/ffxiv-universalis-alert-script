@@ -90,4 +90,10 @@ describe('groupAlerts', () => {
   test('empty array returns empty array', () => {
     expect(groupAlerts([])).toEqual([]);
   });
+
+  test('group carries discordWebhook from first alert', () => {
+    const alert = makeAlert({ discordWebhook: 'https://discord.com/wh' });
+    const groups = groupAlerts([alert]);
+    expect(groups[0].discordWebhook).toBe('https://discord.com/wh');
+  });
 });

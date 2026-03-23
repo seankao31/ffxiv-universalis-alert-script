@@ -65,6 +65,7 @@ const Grouping = (() => {
         groups.set(key, {
           itemId: alert.itemId,
           name: alert.name,
+          discordWebhook: alert.discordWebhook || '',
           trigger: alert.trigger,
           worlds: [],
         });
@@ -597,7 +598,11 @@ const AlertsPage = (() => {
   }
 
   async function deleteGroup(group) {
-    await Promise.all(group.worlds.map(w => _API().deleteAlert(w.alertId)));
+    const results = await Promise.allSettled(group.worlds.map(w => _API().deleteAlert(w.alertId)));
+    const failures = results.filter(r => r.status === 'rejected');
+    if (failures.length > 0) {
+      throw new Error(`Failed to delete ${failures.length} alert(s). Some may need manual cleanup.`);
+    }
   }
 
   function init() {
