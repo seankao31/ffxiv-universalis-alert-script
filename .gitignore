@@ -1,0 +1,14 @@
+# Brainstorming / visual companion sessions
+.superpowers/
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Node (if added later)
+node_modules/

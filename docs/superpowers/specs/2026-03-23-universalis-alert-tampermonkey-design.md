@@ -24,6 +24,19 @@ Auth is free: the script runs inside the user's logged-in browser session, so `f
 
 Single `.user.js` file, organized into logical sections. No build step — plain JavaScript.
 
+### TamperMonkey Header
+
+Required `@grant` declarations:
+
+```js
+// @grant GM_getValue
+// @grant GM_setValue
+// @match  https://universalis.app/market/*
+// @match  https://universalis.app/account/alerts
+```
+
+`GM_getValue`/`GM_setValue` are used for webhook persistence. Without the `@grant` declarations, these functions are undefined at runtime.
+
 ### Sections
 
 | Section | Responsibility |
@@ -39,7 +52,7 @@ Single `.user.js` file, organized into logical sections. No build step — plain
 
 | Method | Endpoint | Purpose |
 |---|---|---|
-| `GET` | `/api/web/alerts` | Fetch all alerts |
+| `GET` | `/api/web/alerts` | Fetch all alerts (response includes `discordWebhook` per alert) |
 | `POST` | `/api/web/alerts` | Create one alert |
 | `DELETE` | `/api/web/alerts/{alertId}` | Delete one alert |
 
@@ -73,7 +86,7 @@ Individual API alerts are grouped into **logical alert groups**:
 {
   itemId: 44015,
   itemName: "木棉原木",         // scraped from DOM, language-aware
-  name: "木棉原木 price alert",
+  name: "木棉原木 price alert", // taken from the first alert in the group
   trigger: {
     filters: [],
     mapper: "pricePerUnit",
@@ -87,9 +100,15 @@ Individual API alerts are grouped into **logical alert groups**:
 }
 ```
 
-**Grouping rule:** alerts with identical `(itemId, name, trigger)` — differing only in `worldId` — belong to the same logical group. Trigger equality is determined by JSON stringification.
+**Grouping rule:** alerts with identical `(itemId, trigger)` — differing only in `worldId` or `name` — belong to the same logical group. The `name` field is excluded from the equality key because it is a user-editable label; minor name differences (e.g., trailing spaces, manual edits) should not split a group. The group's `name` is taken from the first alert in the group. Trigger equality is determined by normalizing the trigger object to a canonical key order before JSON stringification.
+
+**Canonical trigger key order:** `filters`, `mapper`, `reducer`, `comparison`.
+
+**Multiple distinct rules for the same item** (e.g., price < 130 and price < 200) are supported — they produce separate groups and appear as separate rows on the alerts page.
 
 ### 陸行鳥 DC World IDs
+
+IDs sourced from `GET https://universalis.app/api/v3/game/data-centers`. Verify against this endpoint before shipping; Square Enix can reassign IDs during data center reorganizations.
 
 | World | ID |
 |---|---|
@@ -106,15 +125,20 @@ Individual API alerts are grouped into **logical alert groups**:
 
 ## Market Page (`/market/[itemId]`)
 
+### Injection Readiness
+
+The market page is React-rendered. The script waits for the item name heading (an `h1` or equivalent prominent heading containing the item name) to appear in the DOM before attempting to locate the native button or read the item name. A `MutationObserver` on `document.body` triggers this check.
+
 ### Injection
 
-- Hide the native "Alerts" button (second `.btn_addto_list` on the page)
-- Inject a custom "🔔 Set Alerts" button next to it
+- Locate the native "Alerts" button by matching button text content containing `"Alerts"`. This text is always English regardless of the user's locale setting (Universalis uses English for UI chrome elements even when item names are localized).
+- Fallback selector if text matching fails: the button immediately following the "Add to list" button in the action bar.
+- Hide the native button; inject a custom "🔔 Set Alerts" button in its place.
 
 ### Modal UX
 
 On button click:
-1. Fetch all alerts via `GET /api/web/alerts`, filter to current `itemId`
+1. Fetch fresh alert state via `GET /api/web/alerts`, filter to current `itemId`
 2. Read item name from page DOM (already rendered in the user's configured language)
 3. Open modal with fields:
    - **Alert name** — pre-filled with item name
@@ -126,22 +150,27 @@ On button click:
 
 ### Save Logic
 
+To prevent data loss on partial failure: all `POST` requests are issued first. `DELETE` requests are only sent after **all** `POST` requests succeed. If any `POST` fails, no deletions are performed and an error message is shown listing the affected worlds. The user can retry; any duplicate alerts created in a failure scenario are cleaned up on the next successful save.
+
 For each world in 陸行鳥 DC:
 - If **newly checked** and no existing alert → `POST` new alert
-- If **unchecked** and had existing alert → `DELETE` that alert
+- If **unchecked** and had existing alert → `DELETE` that alert (only after all POSTs succeed)
 - If **checked** and already has identical alert → skip (no-op)
-- If **checked** and has an alert with different rule → `DELETE` old, `POST` new
+- If **checked** and has an alert with different rule → `POST` new alert; if all POSTs succeed, `DELETE` old alert
 
 ---
 
 ## Alerts Page (`/account/alerts`)
 
-### Injection
+### Injection Readiness
 
 1. `MutationObserver` on `document.body` detects Next.js client-side navigation to `/account/alerts`
-2. Once the native React list mounts, wait for render to stabilize (~200ms debounce with no further DOM mutations)
-3. Walk the native DOM: collect `{ itemId → itemName }` from item anchor `href="/market/{itemId}"` elements (names are already rendered in the user's language — no extra API calls needed)
-4. Hide native content, inject enhanced panel
+2. Wait for at least one `a[href^="/market/"]` anchor to appear in the DOM — this is the deterministic signal that the native React list has rendered item data
+3. Walk the native DOM: collect `{ itemId → itemName }` — item ID from the `href` path, item name from the anchor's text content (already rendered in the user's language — no extra API calls needed)
+4. If scraping yields zero anchors (user has no alerts), skip injection and leave the native page intact
+5. Hide native content, inject enhanced panel
+
+**Item name fallback:** any alert whose `itemId` was not found during DOM scraping is displayed as `"Item #44015"` in the panel.
 
 ### Enhanced Panel UX
 
@@ -149,22 +178,22 @@ Table layout, one row per logical alert group:
 
 | Column | Content |
 |---|---|
-| Item | Item name + ID (scraped from native DOM) |
+| Item | Item name + ID (scraped from native DOM; `"Item #XXXXX"` if not found) |
 | Rule | Human-readable summary, e.g. "Min price < 130" with HQ badge if applicable |
 | Worlds | Pill tags for each world covered |
 | Actions | Edit button, Delete button |
 
-- **Edit** — opens the same Modal as the market page, pre-populated with existing values. Save = delete all alerts in the group + create new ones for the selected worlds/rule.
+- **Edit** — re-fetches `GET /api/web/alerts` on open to get fresh state (avoids stale in-memory edits). Opens the same Modal pre-populated with the group's current values. Uses the same POST-first, DELETE-after save logic as the market page modal.
 - **Delete** — deletes all `alertId`s in the group in parallel, then removes the row.
 
 ---
 
 ## Discord Webhook
 
-Treated as a global setting shared across all alerts.
+Treated as a global setting shared across all alerts. The `GET /api/web/alerts` response includes `discordWebhook` per alert object.
 
 **Auto-populate priority (on modal open):**
-1. Webhook found in existing alerts for this item (from `GET /api/web/alerts` response)
+1. Webhook found in existing alerts for this item (read from `GET /api/web/alerts` response field `discordWebhook`)
 2. `GM_getValue('discordWebhook')` — last used value, persisted by TamperMonkey
 3. Empty — user enters manually
 
@@ -183,4 +212,3 @@ Universalis is a Next.js SPA — navigating between pages does not reload the do
 - Supporting multiple data centers (hardcoded to 陸行鳥)
 - Per-world different rules for the same item
 - Pagination or lazy-loaded alert lists (assumed all alerts fit in a single render)
-- Edge case where an item alert is not visible in the rendered DOM before scraping
