@@ -47,8 +47,6 @@ describe('createAlert', () => {
 
 describe('deleteAlert', () => {
   test('sends DELETE to /api/web/alerts/{id}', async () => {
-    mockFetch({}, 204);
-    // 204 No Content is ok; override ok manually since status 204 is ok
     jest.spyOn(global, 'fetch').mockResolvedValue({ ok: true, status: 204 });
     await API.deleteAlert('alert-abc');
     expect(global.fetch).toHaveBeenCalledWith('/api/web/alerts/alert-abc', { method: 'DELETE' });
