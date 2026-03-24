@@ -13,7 +13,7 @@ The native Universalis alert UI requires filling out a separate form for each wo
 
 A TamperMonkey userscript that injects into two pages of universalis.app:
 
-1. `/market/[itemId]` — replaces the native Alerts button/modal with a custom multi-world creation modal
+1. `/market/[itemId]` — appends a custom "Set Alerts" button to the native button bar, opening a multi-world creation modal
 2. `/account/alerts` — replaces the native alert list with a denser, grouped, editable panel
 
 Auth is free: the script runs inside the user's logged-in browser session, so `fetch` calls carry cookies automatically.
@@ -22,7 +22,7 @@ Auth is free: the script runs inside the user's logged-in browser session, so `f
 
 ## Architecture
 
-Single `.user.js` file, organized into logical sections. No build step — plain JavaScript.
+Source is split into logical modules under `src/`, concatenated into a single `.user.js` by `node build.js`.
 
 ### TamperMonkey Header
 
@@ -135,13 +135,12 @@ IDs sourced from `GET https://universalis.app/api/v3/game/data-centers`. **Pre-s
 
 ### Injection Readiness
 
-The market page is React-rendered. The script waits for the item name heading to appear in the DOM before attempting to locate the native button or read the item name. A `MutationObserver` on `document.body` triggers this check.
+The market page is React-rendered. The script waits for the button bar (`div.box_flex.form`) to appear in the DOM before injecting. A `MutationObserver` on `document.body` triggers this check. This container is the reliable readiness signal because it is the exact element the button is appended to, ensuring it exists on both full reload and SPA back-navigation.
 
 ### Injection
 
-- Locate the native "Alerts" button by matching button text content containing `"Alerts"`. This text is always English regardless of the user's locale setting (Universalis uses English for UI chrome elements even when item names are localized).
-- Fallback selector if text matching fails: the button immediately following the "Add to list" button in the action bar.
-- Hide the native button; inject a custom "🔔 Set Alerts" button in its place.
+- Locate the button bar container via `document.querySelector('.box_flex.form')`. This `<div>` holds the external tool links (Saddlebag Exchange, GarlandTools, Teamcraft) and the native action buttons (清單, 收藏, 提醒).
+- Append a custom "🔔 Set Alerts" button to the end of this container. The native buttons are left untouched (not hidden or replaced).
 
 ### Modal UX
 

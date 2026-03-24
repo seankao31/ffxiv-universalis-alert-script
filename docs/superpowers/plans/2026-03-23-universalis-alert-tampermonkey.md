@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build a single TamperMonkey `.user.js` that replaces the native Universalis alert UI with a multi-world creation modal on `/market/[itemId]` and a dense grouped management panel on `/account/alerts`.
+**Goal:** Build a single TamperMonkey `.user.js` that adds a multi-world alert creation modal on `/market/[itemId]` (appended to the native button bar) and a dense grouped management panel on `/account/alerts`.
 
 **Architecture:** Plain ES6 JavaScript organized as IIFE modules that expose a conditional `module.exports` for Jest testability. A Node.js build script concatenates source files in dependency order into the final `universalis-alert.user.js`. No transpiler, no bundler — the output is drop-in installable.
 
@@ -1039,7 +1039,7 @@ git commit -m "feat: add Modal component with webhook auto-populate and world ch
 - Create: `src/market-page.js`
 - Create: `tests/market-page.test.js`
 
-Waits for item heading in DOM, hides native Alerts button, injects custom button, opens modal on click pre-populated from first group.
+Waits for the button bar (`div.box_flex.form`) to appear in DOM, appends a custom "Set Alerts" button to it (native buttons are left untouched), opens modal on click pre-populated from first group. **Note:** The code snippets below reflect the original plan; the implementation now uses `findButtonBar()` instead of `findNativeAlertsButton()` — see the spec doc and source for the current approach.
 
 - [ ] **Step 1: Write the failing tests**
 
