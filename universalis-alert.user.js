@@ -221,7 +221,7 @@ const SaveOps = (() => {
         postsNeeded.push(world);
       } else if (!isSelected && existing) {
         // Unchecked, had existing alert → DELETE after success
-        deletesAfterSuccess.push(existing.alertId);
+        deletesAfterSuccess.push({ alertId: existing.alertId, worldId: existing.worldId, worldName: existing.worldName || '' });
       } else if (isSelected && existing) {
         const existingTriggerKey = _Grouping.normalizeTrigger(group.trigger);
         const triggerChanged = newTriggerKey !== existingTriggerKey;
@@ -229,7 +229,7 @@ const SaveOps = (() => {
         if (triggerChanged || nameChanged) {
           // Rule or name changed → POST new, DELETE old
           postsNeeded.push(world);
-          deletesAfterSuccess.push(existing.alertId);
+          deletesAfterSuccess.push({ alertId: existing.alertId, worldId: existing.worldId, worldName: existing.worldName || '' });
         }
         // else: identical — no-op
       }
@@ -269,9 +269,12 @@ const SaveOps = (() => {
         })
       );
 
-      const failures = results.filter(r => r.status === 'rejected');
-      if (failures.length > 0) {
-        throw new Error(`Failed to create ${failures.length} alert(s). No deletions performed.`);
+      const failedIndices = results
+        .map((r, i) => r.status === 'rejected' ? i : -1)
+        .filter(i => i !== -1);
+      if (failedIndices.length > 0) {
+        const names = failedIndices.map(i => ops.postsNeeded[i].worldName || ops.postsNeeded[i].worldId).join(', ');
+        throw new Error(`Failed to save alerts for: ${names}`);
       }
     }
 
@@ -279,18 +282,21 @@ const SaveOps = (() => {
       const deleteTotal = ops.deletesAfterSuccess.length;
       let deleteCompleted = 0;
       const deleteResults = await Promise.allSettled(
-        ops.deletesAfterSuccess.map(async (id) => {
+        ops.deletesAfterSuccess.map(async (entry) => {
           try {
-            return await _API.deleteAlert(id);
+            return await _API.deleteAlert(entry.alertId);
           } finally {
             deleteCompleted++;
             onProgress?.({ phase: 'removing', completed: deleteCompleted, total: deleteTotal });
           }
         })
       );
-      const deleteFailures = deleteResults.filter(r => r.status === 'rejected');
-      if (deleteFailures.length > 0) {
-        throw new Error(`Failed to delete ${deleteFailures.length} alert(s). Some alerts may need manual cleanup.`);
+      const failedDeleteIndices = deleteResults
+        .map((r, i) => r.status === 'rejected' ? i : -1)
+        .filter(i => i !== -1);
+      if (failedDeleteIndices.length > 0) {
+        const names = failedDeleteIndices.map(i => ops.deletesAfterSuccess[i].worldName || ops.deletesAfterSuccess[i].worldId).join(', ');
+        throw new Error(`Alerts saved, but failed to remove old alerts for: ${names}. These may need manual cleanup.`);
       }
     }
   }
@@ -444,7 +450,9 @@ const Modal = (() => {
 
       const onProgress = ({ phase, completed, total }) => {
         statusEl.style.display = 'block';
-        if (phase === 'creating') {
+        if (phase === 'refreshing') {
+          statusEl.textContent = 'Refreshing state...';
+        } else if (phase === 'creating') {
           statusEl.textContent = `Creating alert ${completed} of ${total}...`;
         } else {
           statusEl.textContent = `Removing old alert ${completed} of ${total}...`;
@@ -548,7 +556,19 @@ const MarketPage = (() => {
       group,
       multipleGroups,
       onSave: async (formState, onProgress) => {
-        const ops = _SaveOps().computeSaveOps(group, formState, _WorldMap().WORLDS);
+        onProgress?.({ phase: 'refreshing' });
+        const freshAlerts = await _API().getAlerts();
+        const freshItemAlerts = freshAlerts.filter(a => a.itemId === itemId);
+        const freshGroups = _Grouping().groupAlerts(freshItemAlerts);
+        freshGroups.forEach(g => {
+          g.worlds = g.worlds.map(w => ({ ...w, worldName: _WorldMap().worldById(w.worldId)?.worldName || '' }));
+        });
+        const { normalizeTrigger } = _Grouping();
+        const originalTriggerKey = group ? normalizeTrigger(group.trigger) : null;
+        const freshGroup = originalTriggerKey
+          ? freshGroups.find(g => normalizeTrigger(g.trigger) === originalTriggerKey) || null
+          : null;
+        const ops = _SaveOps().computeSaveOps(freshGroup, formState, _WorldMap().WORLDS);
         await _SaveOps().executeSaveOps(ops, itemId, formState, { onProgress });
       },
     });
@@ -665,10 +685,22 @@ const AlertsPage = (() => {
 
       if (action === 'delete') {
         e.target.disabled = true;
-        await deleteGroup(group, ({ completed, total }) => {
+        const { failures } = await deleteGroup(group, ({ completed, total }) => {
           e.target.textContent = `Deleting ${completed}/${total}...`;
         });
-        e.target.closest('tr').remove();
+        if (failures.length === 0) {
+          e.target.closest('tr').remove();
+        } else {
+          // Update group to only contain failed worlds for retry
+          group.worlds = failures;
+          e.target.textContent = `Retry (${failures.length} remaining)`;
+          e.target.disabled = false;
+          // Update world pills in the row
+          const pillsCell = e.target.closest('tr').querySelector('td:nth-child(3)');
+          pillsCell.innerHTML = failures
+            .map(w => `<span style="background:#1a3a5c;border-radius:12px;padding:2px 8px;font-size:12px;margin:2px">${w.worldName || w.worldId}</span>`)
+            .join('');
+        }
       } else if (action === 'edit') {
         // Re-fetch to get fresh state
         let freshAlerts;
@@ -695,12 +727,21 @@ const AlertsPage = (() => {
           group: freshGroup,
           multipleGroups: false,
           onSave: async (formState, onProgress) => {
-            const ops = _SaveOps().computeSaveOps(freshGroup, formState, _WorldMap().WORLDS);
+            onProgress?.({ phase: 'refreshing' });
+            const refetchedAlerts = await _API().getAlerts();
+            const refetchedItemAlerts = refetchedAlerts.filter(a => a.itemId === group.itemId);
+            const refetchedGroups = _Grouping().groupAlerts(refetchedItemAlerts);
+            refetchedGroups.forEach(g => {
+              g.worlds = g.worlds.map(w => ({ ...w, worldName: _WorldMap().worldById(w.worldId)?.worldName || '' }));
+            });
+            const { normalizeTrigger } = _Grouping();
+            const originalTriggerKey = normalizeTrigger(group.trigger);
+            const latestGroup = refetchedGroups.find(g => normalizeTrigger(g.trigger) === originalTriggerKey) || null;
+            const ops = _SaveOps().computeSaveOps(latestGroup, formState, _WorldMap().WORLDS);
             await _SaveOps().executeSaveOps(ops, group.itemId, formState, { onProgress });
             // Refresh panel after save
             const updatedAlerts = await _API().getAlerts();
             const updatedNames = scrapeItemNames();
-            // Merge in persisted nameMap entries (native DOM may be hidden)
             nameMap.forEach((v, k) => { if (!updatedNames.has(k)) updatedNames.set(k, v); });
             renderAlertsPanel(updatedAlerts, updatedNames);
           },
@@ -723,10 +764,10 @@ const AlertsPage = (() => {
         onProgress?.({ completed, total });
       }
     }));
-    const failures = results.filter(r => r.status === 'rejected');
-    if (failures.length > 0) {
-      throw new Error(`Failed to delete ${failures.length} alert(s). Some may need manual cleanup.`);
-    }
+    const failures = results
+      .map((r, i) => r.status === 'rejected' ? group.worlds[i] : null)
+      .filter(Boolean);
+    return { failures };
   }
 
   function init() {

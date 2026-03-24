@@ -176,11 +176,13 @@ On button click:
 
 **Progress indication:** Because API requests are rate-limited and serialised, save operations are no longer instantaneous. The modal provides real-time feedback:
 - The Save button changes to **"Saving..."** and is disabled on click.
-- A status line below the error area shows per-request progress: **"Creating alert 3 of 8..."** during POSTs, then **"Removing old alert 1 of 3..."** during DELETEs.
+- A status line below the error area shows per-request progress: **"Refreshing state..."** during re-fetch, then **"Creating alert 3 of 8..."** during POSTs, then **"Removing old alert 1 of 3..."** during DELETEs.
 - On error, the status line is hidden, the error area is shown, and the Save button resets to **"Save"** (re-enabled).
 - The `onSave` callback receives an `onProgress` function as its second argument; this is threaded through to `executeSaveOps({ onProgress })`.
 
-To prevent data loss on partial failure: all `POST` requests are issued first. `DELETE` requests are only sent after **all** `POST` requests succeed. If any `POST` fails, no deletions are performed and an error message is shown listing the affected worlds. Any duplicate alerts created in a failure scenario are cleaned up on the next successful save.
+On every save (including retries), `onSave` re-fetches `GET /api/web/alerts`, filters to the current item, re-groups, and finds the matching group by normalized trigger key. This prevents stale-group duplicates when retrying after partial failure. The modal shows **"Refreshing state..."** during the re-fetch.
+
+To prevent data loss on partial failure: all `POST` requests are issued first. `DELETE` requests are only sent after **all** `POST` requests succeed. If any `POST` fails, no deletions are performed and an error message is shown listing the affected worlds (e.g., **"Failed to save alerts for: 利維坦, 鳳凰"**). If any `DELETE` fails after POSTs succeed, the error names the affected worlds (e.g., **"Alerts saved, but failed to remove old alerts for: 巴哈姆特"**). Any duplicate alerts created in a failure scenario are cleaned up on the next successful save.
 
 The save operates only on the pre-populated group (identified by its normalized trigger). Alerts belonging to other groups for the same item are left untouched.
 
@@ -217,7 +219,7 @@ Table layout, one row per logical alert group:
 | Actions | Edit button, Delete button |
 
 - **Edit** — re-fetches `GET /api/web/alerts` on open to get fresh state. Opens the same Modal pre-populated with the group's current values. On save, if the trigger has changed, all `alertId`s in the original group are treated as "old" and are deleted after all POSTs for the new configuration succeed. Uses the same POST-first, DELETE-after logic and progress indication as the market page.
-- **Delete** — deletes all `alertId`s in the group (serialised via the rate-limit queue), then removes the row. The Delete button text updates with progress: **"Deleting 3/5..."**.
+- **Delete** — deletes all `alertId`s in the group (serialised via the rate-limit queue), then removes the row. The Delete button text updates with progress: **"Deleting 3/5..."**. On partial failure, the button shows **"Retry (N remaining)"** and is re-enabled; the world pills update to show only the failed worlds. Clicking again retries only the remaining deletions.
 
 ---
 
