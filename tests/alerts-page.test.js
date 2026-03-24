@@ -128,24 +128,38 @@ describe('renderAlertsPanel — edit onSave re-fetch', () => {
 });
 
 describe('deleteGroup', () => {
-  test('calls deleteAlert for each alertId in group in parallel', async () => {
+  test('calls deleteAlert for each alertId in group', async () => {
     API.deleteAlert.mockResolvedValue();
-    const group = { worlds: [{ alertId: 'a1' }, { alertId: 'a2' }] };
-    await AlertsPage.deleteGroup(group);
+    const group = { worlds: [
+      { alertId: 'a1', worldId: 4030, worldName: '利維坦' },
+      { alertId: 'a2', worldId: 4031, worldName: '鳳凰' },
+    ] };
+    const result = await AlertsPage.deleteGroup(group);
     expect(API.deleteAlert).toHaveBeenCalledTimes(2);
     expect(API.deleteAlert).toHaveBeenCalledWith('a1');
     expect(API.deleteAlert).toHaveBeenCalledWith('a2');
+    expect(result.failures).toEqual([]);
   });
 
-  test('throws if any deleteAlert fails', async () => {
-    API.deleteAlert.mockResolvedValueOnce().mockRejectedValueOnce(new Error('404'));
-    const group = { worlds: [{ alertId: 'a1' }, { alertId: 'a2' }] };
-    await expect(AlertsPage.deleteGroup(group)).rejects.toThrow('Failed to delete 1 alert');
+  test('returns failures with world info on partial failure', async () => {
+    API.deleteAlert.mockResolvedValueOnce().mockRejectedValueOnce(new Error('500'));
+    const group = { worlds: [
+      { alertId: 'a1', worldId: 4030, worldName: '利維坦' },
+      { alertId: 'a2', worldId: 4031, worldName: '鳳凰' },
+    ] };
+    const result = await AlertsPage.deleteGroup(group);
+    expect(result.failures).toEqual([
+      { alertId: 'a2', worldId: 4031, worldName: '鳳凰' },
+    ]);
   });
 
   test('calls onProgress after each deletion', async () => {
     API.deleteAlert.mockResolvedValue();
-    const group = { worlds: [{ alertId: 'a1' }, { alertId: 'a2' }, { alertId: 'a3' }] };
+    const group = { worlds: [
+      { alertId: 'a1', worldId: 4030, worldName: '利維坦' },
+      { alertId: 'a2', worldId: 4031, worldName: '鳳凰' },
+      { alertId: 'a3', worldId: 4032, worldName: '奧汀' },
+    ] };
     const progressCalls = [];
     await AlertsPage.deleteGroup(group, (p) => progressCalls.push(p));
     expect(progressCalls).toEqual([
@@ -153,5 +167,51 @@ describe('deleteGroup', () => {
       { completed: 2, total: 3 },
       { completed: 3, total: 3 },
     ]);
+  });
+});
+
+describe('delete button — retry on partial failure', () => {
+  const trigger = { filters: [], mapper: 'pricePerUnit', reducer: 'min', comparison: { lt: { target: 130 } } };
+  const alert1 = { id: 'a1', itemId: 44015, worldId: 4030, name: 'My Alert', discordWebhook: 'https://wh.com',
+    triggerVersion: 0, trigger };
+  const alert2 = { ...alert1, id: 'a2', worldId: 4031 };
+  const alert3 = { ...alert1, id: 'a3', worldId: 4032 };
+
+  test('shows "Retry (N remaining)" and updates pills on partial delete failure', async () => {
+    setupNativeDOM();
+    // First delete succeeds, second fails, third fails
+    API.deleteAlert
+      .mockResolvedValueOnce()
+      .mockRejectedValueOnce(new Error('500'))
+      .mockRejectedValueOnce(new Error('500'));
+
+    AlertsPage.renderAlertsPanel([alert1, alert2, alert3], new Map([[44015, '木棉原木']]));
+
+    const deleteBtn = document.querySelector('[data-action="delete"]');
+    deleteBtn.click();
+    await new Promise(r => setTimeout(r, 0));
+
+    // Button should show retry text and be re-enabled
+    expect(deleteBtn.textContent).toBe('Retry (2 remaining)');
+    expect(deleteBtn.disabled).toBe(false);
+
+    // World pills should only show the 2 failed worlds
+    const row = deleteBtn.closest('tr');
+    const pills = row.querySelectorAll('td:nth-child(3) span');
+    expect(pills).toHaveLength(2);
+  });
+
+  test('removes row when all deletes succeed', async () => {
+    setupNativeDOM();
+    API.deleteAlert.mockResolvedValue();
+
+    AlertsPage.renderAlertsPanel([alert1, alert2], new Map([[44015, '木棉原木']]));
+
+    const deleteBtn = document.querySelector('[data-action="delete"]');
+    const row = deleteBtn.closest('tr');
+    deleteBtn.click();
+    await new Promise(r => setTimeout(r, 0));
+
+    expect(row.parentNode).toBeNull(); // removed from DOM
   });
 });

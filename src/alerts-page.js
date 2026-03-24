@@ -83,10 +83,22 @@ const AlertsPage = (() => {
 
       if (action === 'delete') {
         e.target.disabled = true;
-        await deleteGroup(group, ({ completed, total }) => {
+        const { failures } = await deleteGroup(group, ({ completed, total }) => {
           e.target.textContent = `Deleting ${completed}/${total}...`;
         });
-        e.target.closest('tr').remove();
+        if (failures.length === 0) {
+          e.target.closest('tr').remove();
+        } else {
+          // Update group to only contain failed worlds for retry
+          group.worlds = failures;
+          e.target.textContent = `Retry (${failures.length} remaining)`;
+          e.target.disabled = false;
+          // Update world pills in the row
+          const pillsCell = e.target.closest('tr').querySelector('td:nth-child(3)');
+          pillsCell.innerHTML = failures
+            .map(w => `<span style="background:#1a3a5c;border-radius:12px;padding:2px 8px;font-size:12px;margin:2px">${w.worldName || w.worldId}</span>`)
+            .join('');
+        }
       } else if (action === 'edit') {
         // Re-fetch to get fresh state
         let freshAlerts;
@@ -150,10 +162,10 @@ const AlertsPage = (() => {
         onProgress?.({ completed, total });
       }
     }));
-    const failures = results.filter(r => r.status === 'rejected');
-    if (failures.length > 0) {
-      throw new Error(`Failed to delete ${failures.length} alert(s). Some may need manual cleanup.`);
-    }
+    const failures = results
+      .map((r, i) => r.status === 'rejected' ? group.worlds[i] : null)
+      .filter(Boolean);
+    return { failures };
   }
 
   function init() {
