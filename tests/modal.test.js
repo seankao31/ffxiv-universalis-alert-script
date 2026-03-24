@@ -128,6 +128,26 @@ describe('openModal — save progress', () => {
     expect(document.querySelector('#univ-alert-modal')).toBeNull();
   });
 
+  test('displays "Refreshing state..." for refreshing phase', async () => {
+    let resolveOnSave;
+    const onSave = jest.fn(() => new Promise(r => { resolveOnSave = r; }));
+    GM_getValue.mockReturnValue('https://wh.com');
+    Modal.openModal({ itemId: 44015, itemName: 'Item', group: null, onSave });
+
+    const saveBtn = document.querySelector('#univ-alert-modal [data-action="save"]');
+    const statusEl = document.querySelector('#univ-alert-modal [data-status]');
+    saveBtn.click();
+    await new Promise(r => setTimeout(r, 0));
+
+    const onProgress = onSave.mock.calls[0][1];
+    onProgress({ phase: 'refreshing' });
+    expect(statusEl.style.display).toBe('block');
+    expect(statusEl.textContent).toBe('Refreshing state...');
+
+    resolveOnSave();
+    await new Promise(r => setTimeout(r, 0));
+  });
+
   test('hides status and restores button on save error', async () => {
     const onSave = jest.fn().mockRejectedValue(new Error('Save failed'));
     GM_getValue.mockReturnValue('https://wh.com');

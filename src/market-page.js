@@ -70,7 +70,19 @@ const MarketPage = (() => {
       group,
       multipleGroups,
       onSave: async (formState, onProgress) => {
-        const ops = _SaveOps().computeSaveOps(group, formState, _WorldMap().WORLDS);
+        onProgress?.({ phase: 'refreshing' });
+        const freshAlerts = await _API().getAlerts();
+        const freshItemAlerts = freshAlerts.filter(a => a.itemId === itemId);
+        const freshGroups = _Grouping().groupAlerts(freshItemAlerts);
+        freshGroups.forEach(g => {
+          g.worlds = g.worlds.map(w => ({ ...w, worldName: _WorldMap().worldById(w.worldId)?.worldName || '' }));
+        });
+        const { normalizeTrigger } = _Grouping();
+        const originalTriggerKey = group ? normalizeTrigger(group.trigger) : null;
+        const freshGroup = originalTriggerKey
+          ? freshGroups.find(g => normalizeTrigger(g.trigger) === originalTriggerKey) || null
+          : null;
+        const ops = _SaveOps().computeSaveOps(freshGroup, formState, _WorldMap().WORLDS);
         await _SaveOps().executeSaveOps(ops, itemId, formState, { onProgress });
       },
     });

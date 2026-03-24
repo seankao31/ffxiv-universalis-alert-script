@@ -113,12 +113,21 @@ const AlertsPage = (() => {
           group: freshGroup,
           multipleGroups: false,
           onSave: async (formState, onProgress) => {
-            const ops = _SaveOps().computeSaveOps(freshGroup, formState, _WorldMap().WORLDS);
+            onProgress?.({ phase: 'refreshing' });
+            const refetchedAlerts = await _API().getAlerts();
+            const refetchedItemAlerts = refetchedAlerts.filter(a => a.itemId === group.itemId);
+            const refetchedGroups = _Grouping().groupAlerts(refetchedItemAlerts);
+            refetchedGroups.forEach(g => {
+              g.worlds = g.worlds.map(w => ({ ...w, worldName: _WorldMap().worldById(w.worldId)?.worldName || '' }));
+            });
+            const { normalizeTrigger } = _Grouping();
+            const originalTriggerKey = normalizeTrigger(group.trigger);
+            const latestGroup = refetchedGroups.find(g => normalizeTrigger(g.trigger) === originalTriggerKey) || null;
+            const ops = _SaveOps().computeSaveOps(latestGroup, formState, _WorldMap().WORLDS);
             await _SaveOps().executeSaveOps(ops, group.itemId, formState, { onProgress });
             // Refresh panel after save
             const updatedAlerts = await _API().getAlerts();
             const updatedNames = scrapeItemNames();
-            // Merge in persisted nameMap entries (native DOM may be hidden)
             nameMap.forEach((v, k) => { if (!updatedNames.has(k)) updatedNames.set(k, v); });
             renderAlertsPanel(updatedAlerts, updatedNames);
           },

@@ -140,7 +140,9 @@ const Modal = (() => {
 
       const onProgress = ({ phase, completed, total }) => {
         statusEl.style.display = 'block';
-        if (phase === 'creating') {
+        if (phase === 'refreshing') {
+          statusEl.textContent = 'Refreshing state...';
+        } else if (phase === 'creating') {
           statusEl.textContent = `Creating alert ${completed} of ${total}...`;
         } else {
           statusEl.textContent = `Removing old alert ${completed} of ${total}...`;

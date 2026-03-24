@@ -83,6 +83,50 @@ describe('init — GET failure', () => {
   });
 });
 
+describe('renderAlertsPanel — edit onSave re-fetch', () => {
+  const alert1 = { id: 'a1', itemId: 44015, worldId: 4030, name: 'My Alert', discordWebhook: 'https://wh.com',
+    triggerVersion: 0, trigger: { filters: [], mapper: 'pricePerUnit', reducer: 'min', comparison: { lt: { target: 130 } } } };
+
+  test('edit onSave re-fetches alerts before computing ops', async () => {
+    setupNativeDOM();
+    const nameMap = new Map([[44015, '木棉原木']]);
+
+    // First render — initial alerts
+    API.getAlerts.mockResolvedValue([alert1]);
+    AlertsPage.renderAlertsPanel([alert1], nameMap);
+
+    // Click the edit button
+    const editBtn = document.querySelector('#univ-alert-panel [data-action="edit"]');
+    API.getAlerts.mockResolvedValue([alert1]); // re-fetch inside edit click handler
+    editBtn.click();
+    await new Promise(r => setTimeout(r, 0));
+
+    // Modal.openModal should have been called
+    expect(Modal.openModal).toHaveBeenCalled();
+    const { onSave } = Modal.openModal.mock.calls[0][0];
+
+    // Set up mocks for onSave
+    const onProgress = jest.fn();
+    const formState = { name: 'Test', webhook: 'https://wh.com', trigger: alert1.trigger, selectedWorldIds: new Set([4030]) };
+    SaveOps.computeSaveOps.mockReturnValue({ postsNeeded: [], deletesAfterSuccess: [] });
+    SaveOps.executeSaveOps.mockResolvedValue();
+
+    // Return fresh data on onSave re-fetch
+    const alert2 = { ...alert1, id: 'a2', worldId: 4031 };
+    const getAlertsCallCount = API.getAlerts.mock.calls.length;
+    API.getAlerts.mockResolvedValue([alert1, alert2]);
+
+    await onSave(formState, onProgress);
+
+    // Should have called getAlerts again inside onSave (for re-fetch before computeSaveOps)
+    expect(API.getAlerts.mock.calls.length).toBeGreaterThan(getAlertsCallCount);
+    // onProgress should have been called with 'refreshing' phase
+    expect(onProgress).toHaveBeenCalledWith({ phase: 'refreshing' });
+    // computeSaveOps should have been called
+    expect(SaveOps.computeSaveOps).toHaveBeenCalled();
+  });
+});
+
 describe('deleteGroup', () => {
   test('calls deleteAlert for each alertId in group in parallel', async () => {
     API.deleteAlert.mockResolvedValue();
