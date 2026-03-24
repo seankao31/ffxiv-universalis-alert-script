@@ -54,8 +54,8 @@ const AlertsPage = (() => {
           <td style="padding:10px 8px">${formatRule(g.trigger)}</td>
           <td style="padding:10px 8px">${worldPills}</td>
           <td style="padding:10px 8px;white-space:nowrap">
-            <button data-action="edit" data-group-idx="${idx}" style="background:#1a4a7a;border:none;color:#fff;padding:4px 10px;border-radius:4px;cursor:pointer;margin-right:6px">Edit</button>
-            <button data-action="delete" data-group-idx="${idx}" style="background:#6a1a1a;border:none;color:#fff;padding:4px 10px;border-radius:4px;cursor:pointer">Delete</button>
+            <button data-action="edit" data-group-idx="${idx}" style="background:#1a4a7a;border:none;color:#fff;padding:4px 10px;border-radius:4px;cursor:pointer;margin-right:6px;display:inline-flex;align-items:center;justify-content:center">Edit</button>
+            <button data-action="delete" data-group-idx="${idx}" style="background:#6a1a1a;border:none;color:#fff;padding:4px 10px;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center">Delete</button>
           </td>
         </tr>`;
     }).join('');

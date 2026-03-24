@@ -30,7 +30,7 @@ const MarketPage = (() => {
     const btn = document.createElement('button');
     btn.id = 'univ-alert-btn';
     btn.textContent = '🔔 Set Alerts';
-    btn.style.cssText = 'background:#1a5a8a;border:none;color:#fff;padding:8px 16px;border-radius:4px;cursor:pointer';
+    btn.style.cssText = 'background:#1a5a8a;border:none;color:#fff;padding:8px 16px;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center';
 
     btn.addEventListener('click', () => handleAlertButtonClick(itemId, readItemName()));
 
