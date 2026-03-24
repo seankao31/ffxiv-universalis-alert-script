@@ -81,15 +81,20 @@ const MarketPage = (() => {
   }
 
   function init() {
-    // Wait for item name heading (React render signal)
+    function attempt() {
+      if (!document.querySelector('h1')) return false;
+      const pathParts = window.location.pathname.split('/');
+      if (pathParts.length !== 3) return true; // not a /market/{id} page, but done waiting
+      const itemId = Number(pathParts[2]);
+      if (itemId > 0) injectMarketButton(itemId);
+      return true;
+    }
+
+    if (attempt()) return; // h1 already present (SSR/CSR already rendered)
+
+    // h1 not yet in DOM — observe for it (SPA navigation case)
     const observer = new MutationObserver(() => {
-      if (document.querySelector('h1')) {
-        observer.disconnect();
-        const pathParts = window.location.pathname.split('/');
-        if (pathParts.length !== 3) return; // guard: only /market/{id}
-        const itemId = Number(pathParts[2]);
-        if (!isNaN(itemId)) injectMarketButton(itemId);
-      }
+      if (attempt()) observer.disconnect();
     });
     observer.observe(document.body, { childList: true, subtree: true });
   }

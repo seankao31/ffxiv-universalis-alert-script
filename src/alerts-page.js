@@ -141,18 +141,7 @@ const AlertsPage = (() => {
     const stale = document.getElementById('univ-alert-panel');
     if (stale) stale.remove();
 
-    const TIMEOUT_MS = 10000;
-    const startedAt = Date.now();
-
-    const observer = new MutationObserver(async () => {
-      if (!document.querySelector('a[href^="/market/"]')) {
-        if (Date.now() - startedAt > TIMEOUT_MS) {
-          observer.disconnect(); // no alerts — leave native page intact
-        }
-        return;
-      }
-      observer.disconnect();
-
+    async function run() {
       const nameMap = scrapeItemNames();
 
       // Hide native content
@@ -171,6 +160,26 @@ const AlertsPage = (() => {
       }
 
       renderAlertsPanel(alerts, nameMap);
+    }
+
+    if (document.querySelector('a[href^="/market/"]')) {
+      run(); // market links already in DOM (SSR/CSR already rendered)
+      return;
+    }
+
+    // Not yet rendered — observe for market links (SPA navigation case)
+    const TIMEOUT_MS = 10000;
+    const startedAt = Date.now();
+
+    const observer = new MutationObserver(() => {
+      if (!document.querySelector('a[href^="/market/"]')) {
+        if (Date.now() - startedAt > TIMEOUT_MS) {
+          observer.disconnect(); // no alerts — leave native page intact
+        }
+        return;
+      }
+      observer.disconnect();
+      run();
     });
 
     observer.observe(document.body, { childList: true, subtree: true });
