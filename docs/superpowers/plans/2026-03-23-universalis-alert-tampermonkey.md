@@ -17,13 +17,15 @@
 | `src/header.js` | TamperMonkey `==UserScript==` metadata block (comment only, no code) |
 | `src/worldmap.js` | `WORLDS` constant (陸行鳥 DC world list), `worldById(id)` lookup |
 | `src/grouping.js` | `normalizeTrigger(trigger)`, `groupAlerts(alerts)` — pure functions |
-| `src/api.js` | `getAlerts()`, `createAlert(payload)`, `deleteAlert(id)` — thin `fetch` wrappers |
+| `src/rate-limit.js` | `rateLimitedFetch(url, options)` — sequential queue with 429 retry and exponential backoff |
+| `src/api.js` | `getAlerts()`, `createAlert(payload)`, `deleteAlert(id)` — thin wrappers using `RateLimit.rateLimitedFetch` |
 | `src/save-ops.js` | `computeSaveOps(group, formState, worlds)` (pure), `executeSaveOps(ops, itemId, formState)` (async, calls API) |
 | `src/modal.js` | `openModal(options)`, `closeModal()` — shared create/edit modal, DOM construction + events |
 | `src/market-page.js` | `initMarketPage()` — MutationObserver, native button replacement, modal integration |
 | `src/alerts-page.js` | `initAlertsPage()` — MutationObserver, DOM scraping, panel render, edit/delete |
 | `src/init.js` | `main()` — SPA navigation observer, routes to `MarketPage.init()` or `AlertsPage.init()` |
 | `tests/grouping.test.js` | Tests for `normalizeTrigger` and `groupAlerts` |
+| `tests/rate-limit.test.js` | Tests for sequential queue, 429 retry, Retry-After parsing, max retries, queue resilience |
 | `tests/api.test.js` | Tests for `getAlerts`, `createAlert`, `deleteAlert` with mocked `fetch` |
 | `tests/save-ops.test.js` | Tests for `computeSaveOps` (all four world-state cases) and `executeSaveOps` (POST-first ordering, partial failure) |
 | `tests/modal.test.js` | Tests for modal DOM structure, webhook auto-populate priority, Save button disabled state |

@@ -43,7 +43,8 @@ The `@match` pattern `https://universalis.app/market/*` matches any path under `
 
 | Section | Responsibility |
 |---|---|
-| `API` | Thin wrappers: `getAlerts()`, `createAlert(payload)`, `deleteAlert(id)` |
+| `RateLimit` | Sequential request queue with 429 retry and exponential backoff |
+| `API` | Thin wrappers: `getAlerts()`, `createAlert(payload)`, `deleteAlert(id)` — all calls go through `RateLimit` |
 | `WorldMap` | World ID ↔ name mapping, hardcoded to 陸行鳥 DC (IDs 4028–4035) |
 | `Grouping` | Groups flat API alert array into logical alert groups |
 | `Modal` | Shared create/edit modal component, used by both pages |
@@ -61,6 +62,20 @@ The `@match` pattern `https://universalis.app/market/*` matches any path under `
 No `PATCH`/`PUT` exists. Edit = delete affected alerts + create new ones.
 
 **Error handling:** if `GET /api/web/alerts` fails (network error, 4xx, 5xx), the modal displays an inline error ("Failed to load existing alerts — check your connection") and the Save button is disabled. On the alerts page, a full-width error message is shown in place of the panel.
+
+### Rate Limiting
+
+All `fetch` calls in the `API` module go through `RateLimit.rateLimitedFetch()`, a drop-in `fetch` replacement that provides two protections:
+
+1. **Sequential queue** — requests are serialised through a promise chain so that only one HTTP request is in flight at a time, with a 200 ms minimum delay between requests. Callers that fire many promises concurrently (e.g. `Promise.allSettled` in `executeSaveOps`) are transparently throttled without any changes to call-site code.
+
+2. **429 retry with backoff** — if the server returns HTTP 429 (Too Many Requests), the request is retried up to 3 times. The wait before each retry is taken from the `Retry-After` response header (interpreted as seconds) when present, otherwise exponential backoff is used (1 s → 2 s → 4 s). After all retries are exhausted, the 429 response is returned to the caller, which surfaces it through the normal `!res.ok` error path.
+
+| Parameter | Value |
+|---|---|
+| Inter-request delay | 200 ms |
+| Max retries on 429 | 3 |
+| Backoff (no Retry-After header) | 1000 × 2^attempt ms |
 
 ### Alert POST Body
 
