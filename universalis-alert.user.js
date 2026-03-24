@@ -247,11 +247,15 @@ const Modal = (() => {
     overlay.id = 'univ-alert-modal';
     overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:9999';
 
-    const worldCheckboxes = _WorldMap.WORLDS.map(w => `
-      <label style="display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:4px;${existingWorldIds.has(w.worldId) ? 'background:#1a3a5c;' : ''}">
-        <input type="checkbox" data-world-id="${w.worldId}" ${existingWorldIds.has(w.worldId) ? 'checked' : ''}/>
+    const isNewAlert = !group;
+    const worldCheckboxes = _WorldMap.WORLDS.map(w => {
+      const checked = isNewAlert || existingWorldIds.has(w.worldId);
+      return `
+      <label style="display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:4px;${checked ? 'background:#1a3a5c;' : ''}">
+        <input type="checkbox" data-world-id="${w.worldId}" ${checked ? 'checked' : ''}/>
         ${w.worldName}
-      </label>`).join('');
+      </label>`;
+    }).join('');
 
     const multiNotice = multipleGroups
       ? `<div data-notice="multiple-groups" style="background:#3a2a00;border:1px solid #ff9800;padding:8px;border-radius:4px;margin-bottom:12px;font-size:12px">
