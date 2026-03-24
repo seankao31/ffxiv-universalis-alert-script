@@ -52,20 +52,32 @@ const SaveOps = (() => {
   /**
    * Executes save ops: all POSTs first, then DELETEs only if all POSTs succeed.
    * Throws if any POST fails (no deletes will have run).
+   * @param {object}   ops
+   * @param {number}   itemId
+   * @param {object}   formState
+   * @param {object}   [options]
+   * @param {function} [options.onProgress] - called after each request settles: ({ phase, completed, total })
    */
-  async function executeSaveOps(ops, itemId, formState) {
+  async function executeSaveOps(ops, itemId, formState, { onProgress } = {}) {
     if (ops.postsNeeded.length > 0) {
+      const postTotal = ops.postsNeeded.length;
+      let postCompleted = 0;
       const results = await Promise.allSettled(
-        ops.postsNeeded.map(world =>
-          _API.createAlert({
-            name: formState.name,
-            itemId,
-            worldId: world.worldId,
-            discordWebhook: formState.webhook,
-            triggerVersion: 0,
-            trigger: formState.trigger,
-          })
-        )
+        ops.postsNeeded.map(async (world) => {
+          try {
+            return await _API.createAlert({
+              name: formState.name,
+              itemId,
+              worldId: world.worldId,
+              discordWebhook: formState.webhook,
+              triggerVersion: 0,
+              trigger: formState.trigger,
+            });
+          } finally {
+            postCompleted++;
+            onProgress?.({ phase: 'creating', completed: postCompleted, total: postTotal });
+          }
+        })
       );
 
       const failures = results.filter(r => r.status === 'rejected');
@@ -75,7 +87,18 @@ const SaveOps = (() => {
     }
 
     if (ops.deletesAfterSuccess.length > 0) {
-      const deleteResults = await Promise.allSettled(ops.deletesAfterSuccess.map(id => _API.deleteAlert(id)));
+      const deleteTotal = ops.deletesAfterSuccess.length;
+      let deleteCompleted = 0;
+      const deleteResults = await Promise.allSettled(
+        ops.deletesAfterSuccess.map(async (id) => {
+          try {
+            return await _API.deleteAlert(id);
+          } finally {
+            deleteCompleted++;
+            onProgress?.({ phase: 'removing', completed: deleteCompleted, total: deleteTotal });
+          }
+        })
+      );
       const deleteFailures = deleteResults.filter(r => r.status === 'rejected');
       if (deleteFailures.length > 0) {
         throw new Error(`Failed to delete ${deleteFailures.length} alert(s). Some alerts may need manual cleanup.`);

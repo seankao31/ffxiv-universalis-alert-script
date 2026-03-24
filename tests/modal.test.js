@@ -100,6 +100,54 @@ describe('openModal — multi-group notice', () => {
   });
 });
 
+describe('openModal — save progress', () => {
+  test('shows status element and updates button text during save', async () => {
+    let resolveOnSave;
+    const onSave = jest.fn(() => new Promise(r => { resolveOnSave = r; }));
+    GM_getValue.mockReturnValue('https://wh.com');
+    Modal.openModal({ itemId: 44015, itemName: 'Item', group: null, onSave });
+
+    const saveBtn = document.querySelector('#univ-alert-modal [data-action="save"]');
+    const statusEl = document.querySelector('#univ-alert-modal [data-status]');
+    saveBtn.click();
+    await new Promise(r => setTimeout(r, 0)); // flush microtasks
+
+    expect(saveBtn.textContent).toBe('Saving...');
+    expect(saveBtn.disabled).toBe(true);
+
+    // Simulate onProgress callback
+    const onProgress = onSave.mock.calls[0][1];
+    expect(typeof onProgress).toBe('function');
+    onProgress({ phase: 'creating', completed: 1, total: 3 });
+    expect(statusEl.style.display).toBe('block');
+    expect(statusEl.textContent).toBe('Creating alert 1 of 3...');
+
+    resolveOnSave();
+    await new Promise(r => setTimeout(r, 0));
+    // Modal should be closed after successful save
+    expect(document.querySelector('#univ-alert-modal')).toBeNull();
+  });
+
+  test('hides status and restores button on save error', async () => {
+    const onSave = jest.fn().mockRejectedValue(new Error('Save failed'));
+    GM_getValue.mockReturnValue('https://wh.com');
+    Modal.openModal({ itemId: 44015, itemName: 'Item', group: null, onSave });
+
+    const saveBtn = document.querySelector('#univ-alert-modal [data-action="save"]');
+    saveBtn.click();
+    await new Promise(r => setTimeout(r, 0));
+
+    const statusEl = document.querySelector('#univ-alert-modal [data-status]');
+    const errorArea = document.querySelector('#univ-alert-modal [data-error-area]');
+
+    expect(statusEl.style.display).toBe('none');
+    expect(errorArea.style.display).toBe('block');
+    expect(errorArea.textContent).toBe('Save failed');
+    expect(saveBtn.textContent).toBe('Save');
+    expect(saveBtn.disabled).toBe(false);
+  });
+});
+
 describe('closeModal', () => {
   test('removes modal from DOM', () => {
     Modal.openModal({ itemId: 44015, itemName: 'Item', group: null, onSave: jest.fn() });

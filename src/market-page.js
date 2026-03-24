@@ -69,9 +69,9 @@ const MarketPage = (() => {
       itemName,
       group,
       multipleGroups,
-      onSave: async (formState) => {
+      onSave: async (formState, onProgress) => {
         const ops = _SaveOps().computeSaveOps(group, formState, _WorldMap().WORLDS);
-        await _SaveOps().executeSaveOps(ops, itemId, formState);
+        await _SaveOps().executeSaveOps(ops, itemId, formState, { onProgress });
       },
     });
   }

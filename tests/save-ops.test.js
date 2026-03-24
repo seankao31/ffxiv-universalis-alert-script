@@ -109,4 +109,34 @@ describe('executeSaveOps', () => {
     expect(API.createAlert).not.toHaveBeenCalled();
     expect(API.deleteAlert).not.toHaveBeenCalled();
   });
+
+  test('calls onProgress for each POST and DELETE', async () => {
+    jest.spyOn(API, 'createAlert').mockResolvedValue({ id: 'new' });
+    jest.spyOn(API, 'deleteAlert').mockResolvedValue();
+    const progressCalls = [];
+    const onProgress = (p) => progressCalls.push(p);
+
+    await executeSaveOps(ops, 44015, formState, { onProgress });
+
+    expect(progressCalls).toEqual([
+      { phase: 'creating', completed: 1, total: 2 },
+      { phase: 'creating', completed: 2, total: 2 },
+      { phase: 'removing', completed: 1, total: 1 },
+    ]);
+  });
+
+  test('calls onProgress even when a POST fails', async () => {
+    jest.spyOn(API, 'createAlert').mockRejectedValue(new Error('fail'));
+    jest.spyOn(API, 'deleteAlert').mockResolvedValue();
+    const progressCalls = [];
+    const onProgress = (p) => progressCalls.push(p);
+
+    await expect(executeSaveOps(ops, 44015, formState, { onProgress })).rejects.toThrow();
+
+    // Both POSTs should have reported progress despite failures
+    expect(progressCalls).toEqual([
+      { phase: 'creating', completed: 1, total: 2 },
+      { phase: 'creating', completed: 2, total: 2 },
+    ]);
+  });
 });

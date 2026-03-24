@@ -83,7 +83,9 @@ const AlertsPage = (() => {
 
       if (action === 'delete') {
         e.target.disabled = true;
-        await deleteGroup(group);
+        await deleteGroup(group, ({ completed, total }) => {
+          e.target.textContent = `Deleting ${completed}/${total}...`;
+        });
         e.target.closest('tr').remove();
       } else if (action === 'edit') {
         // Re-fetch to get fresh state
@@ -110,9 +112,9 @@ const AlertsPage = (() => {
           itemName,
           group: freshGroup,
           multipleGroups: false,
-          onSave: async (formState) => {
+          onSave: async (formState, onProgress) => {
             const ops = _SaveOps().computeSaveOps(freshGroup, formState, _WorldMap().WORLDS);
-            await _SaveOps().executeSaveOps(ops, group.itemId, formState);
+            await _SaveOps().executeSaveOps(ops, group.itemId, formState, { onProgress });
             // Refresh panel after save
             const updatedAlerts = await _API().getAlerts();
             const updatedNames = scrapeItemNames();
@@ -128,8 +130,17 @@ const AlertsPage = (() => {
     document.body.prepend(panel);
   }
 
-  async function deleteGroup(group) {
-    const results = await Promise.allSettled(group.worlds.map(w => _API().deleteAlert(w.alertId)));
+  async function deleteGroup(group, onProgress) {
+    const total = group.worlds.length;
+    let completed = 0;
+    const results = await Promise.allSettled(group.worlds.map(async (w) => {
+      try {
+        return await _API().deleteAlert(w.alertId);
+      } finally {
+        completed++;
+        onProgress?.({ completed, total });
+      }
+    }));
     const failures = results.filter(r => r.status === 'rejected');
     if (failures.length > 0) {
       throw new Error(`Failed to delete ${failures.length} alert(s). Some may need manual cleanup.`);

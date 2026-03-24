@@ -241,20 +241,32 @@ const SaveOps = (() => {
   /**
    * Executes save ops: all POSTs first, then DELETEs only if all POSTs succeed.
    * Throws if any POST fails (no deletes will have run).
+   * @param {object}   ops
+   * @param {number}   itemId
+   * @param {object}   formState
+   * @param {object}   [options]
+   * @param {function} [options.onProgress] - called after each request settles: ({ phase, completed, total })
    */
-  async function executeSaveOps(ops, itemId, formState) {
+  async function executeSaveOps(ops, itemId, formState, { onProgress } = {}) {
     if (ops.postsNeeded.length > 0) {
+      const postTotal = ops.postsNeeded.length;
+      let postCompleted = 0;
       const results = await Promise.allSettled(
-        ops.postsNeeded.map(world =>
-          _API.createAlert({
-            name: formState.name,
-            itemId,
-            worldId: world.worldId,
-            discordWebhook: formState.webhook,
-            triggerVersion: 0,
-            trigger: formState.trigger,
-          })
-        )
+        ops.postsNeeded.map(async (world) => {
+          try {
+            return await _API.createAlert({
+              name: formState.name,
+              itemId,
+              worldId: world.worldId,
+              discordWebhook: formState.webhook,
+              triggerVersion: 0,
+              trigger: formState.trigger,
+            });
+          } finally {
+            postCompleted++;
+            onProgress?.({ phase: 'creating', completed: postCompleted, total: postTotal });
+          }
+        })
       );
 
       const failures = results.filter(r => r.status === 'rejected');
@@ -264,7 +276,18 @@ const SaveOps = (() => {
     }
 
     if (ops.deletesAfterSuccess.length > 0) {
-      const deleteResults = await Promise.allSettled(ops.deletesAfterSuccess.map(id => _API.deleteAlert(id)));
+      const deleteTotal = ops.deletesAfterSuccess.length;
+      let deleteCompleted = 0;
+      const deleteResults = await Promise.allSettled(
+        ops.deletesAfterSuccess.map(async (id) => {
+          try {
+            return await _API.deleteAlert(id);
+          } finally {
+            deleteCompleted++;
+            onProgress?.({ phase: 'removing', completed: deleteCompleted, total: deleteTotal });
+          }
+        })
+      );
       const deleteFailures = deleteResults.filter(r => r.status === 'rejected');
       if (deleteFailures.length > 0) {
         throw new Error(`Failed to delete ${deleteFailures.length} alert(s). Some alerts may need manual cleanup.`);
@@ -375,6 +398,7 @@ const Modal = (() => {
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">${worldCheckboxes}</div>
           </div>
           <div data-error-area style="display:none;background:#4a1a1a;border:1px solid #c00;padding:8px;border-radius:4px;margin-bottom:12px;font-size:13px"></div>
+          <div data-status style="display:none;color:#aaa;font-size:13px;margin-bottom:12px"></div>
           <div style="display:flex;justify-content:flex-end;gap:8px">
             <button type="button" data-action="cancel" style="background:#2a2a4e;border:1px solid #444;color:#fff;padding:8px 16px;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center">Cancel</button>
             <button type="button" data-action="save" style="background:#1a5a8a;border:none;color:#fff;padding:8px 16px;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center" ${initialWebhook ? '' : 'disabled'}>Save</button>
@@ -388,6 +412,7 @@ const Modal = (() => {
     const webhookInput = overlay.querySelector('[data-field="webhook"]');
     const saveBtn = overlay.querySelector('[data-action="save"]');
     const errorArea = overlay.querySelector('[data-error-area]');
+    const statusEl = overlay.querySelector('[data-status]');
 
     // Enable/disable Save based on webhook
     webhookInput.addEventListener('input', () => {
@@ -404,7 +429,9 @@ const Modal = (() => {
 
     saveBtn.addEventListener('click', async () => {
       saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving...';
       errorArea.style.display = 'none';
+      statusEl.style.display = 'none';
 
       const webhook = webhookInput.value.trim();
       const selectedWorldIds = new Set(
@@ -415,12 +442,23 @@ const Modal = (() => {
 
       GM_setValue('discordWebhook', webhook);
 
+      const onProgress = ({ phase, completed, total }) => {
+        statusEl.style.display = 'block';
+        if (phase === 'creating') {
+          statusEl.textContent = `Creating alert ${completed} of ${total}...`;
+        } else {
+          statusEl.textContent = `Removing old alert ${completed} of ${total}...`;
+        }
+      };
+
       try {
-        await onSave({ name, webhook, trigger, selectedWorldIds });
+        await onSave({ name, webhook, trigger, selectedWorldIds }, onProgress);
         closeModal();
       } catch (err) {
+        statusEl.style.display = 'none';
         errorArea.textContent = err.message;
         errorArea.style.display = 'block';
+        saveBtn.textContent = 'Save';
         saveBtn.disabled = false;
       }
     });
@@ -509,9 +547,9 @@ const MarketPage = (() => {
       itemName,
       group,
       multipleGroups,
-      onSave: async (formState) => {
+      onSave: async (formState, onProgress) => {
         const ops = _SaveOps().computeSaveOps(group, formState, _WorldMap().WORLDS);
-        await _SaveOps().executeSaveOps(ops, itemId, formState);
+        await _SaveOps().executeSaveOps(ops, itemId, formState, { onProgress });
       },
     });
   }
@@ -627,7 +665,9 @@ const AlertsPage = (() => {
 
       if (action === 'delete') {
         e.target.disabled = true;
-        await deleteGroup(group);
+        await deleteGroup(group, ({ completed, total }) => {
+          e.target.textContent = `Deleting ${completed}/${total}...`;
+        });
         e.target.closest('tr').remove();
       } else if (action === 'edit') {
         // Re-fetch to get fresh state
@@ -654,9 +694,9 @@ const AlertsPage = (() => {
           itemName,
           group: freshGroup,
           multipleGroups: false,
-          onSave: async (formState) => {
+          onSave: async (formState, onProgress) => {
             const ops = _SaveOps().computeSaveOps(freshGroup, formState, _WorldMap().WORLDS);
-            await _SaveOps().executeSaveOps(ops, group.itemId, formState);
+            await _SaveOps().executeSaveOps(ops, group.itemId, formState, { onProgress });
             // Refresh panel after save
             const updatedAlerts = await _API().getAlerts();
             const updatedNames = scrapeItemNames();
@@ -672,8 +712,17 @@ const AlertsPage = (() => {
     document.body.prepend(panel);
   }
 
-  async function deleteGroup(group) {
-    const results = await Promise.allSettled(group.worlds.map(w => _API().deleteAlert(w.alertId)));
+  async function deleteGroup(group, onProgress) {
+    const total = group.worlds.length;
+    let completed = 0;
+    const results = await Promise.allSettled(group.worlds.map(async (w) => {
+      try {
+        return await _API().deleteAlert(w.alertId);
+      } finally {
+        completed++;
+        onProgress?.({ completed, total });
+      }
+    }));
     const failures = results.filter(r => r.status === 'rejected');
     if (failures.length > 0) {
       throw new Error(`Failed to delete ${failures.length} alert(s). Some may need manual cleanup.`);

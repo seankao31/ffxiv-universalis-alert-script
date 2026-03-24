@@ -98,4 +98,16 @@ describe('deleteGroup', () => {
     const group = { worlds: [{ alertId: 'a1' }, { alertId: 'a2' }] };
     await expect(AlertsPage.deleteGroup(group)).rejects.toThrow('Failed to delete 1 alert');
   });
+
+  test('calls onProgress after each deletion', async () => {
+    API.deleteAlert.mockResolvedValue();
+    const group = { worlds: [{ alertId: 'a1' }, { alertId: 'a2' }, { alertId: 'a3' }] };
+    const progressCalls = [];
+    await AlertsPage.deleteGroup(group, (p) => progressCalls.push(p));
+    expect(progressCalls).toEqual([
+      { completed: 1, total: 3 },
+      { completed: 2, total: 3 },
+      { completed: 3, total: 3 },
+    ]);
+  });
 });

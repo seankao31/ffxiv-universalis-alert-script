@@ -94,6 +94,7 @@ const Modal = (() => {
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">${worldCheckboxes}</div>
           </div>
           <div data-error-area style="display:none;background:#4a1a1a;border:1px solid #c00;padding:8px;border-radius:4px;margin-bottom:12px;font-size:13px"></div>
+          <div data-status style="display:none;color:#aaa;font-size:13px;margin-bottom:12px"></div>
           <div style="display:flex;justify-content:flex-end;gap:8px">
             <button type="button" data-action="cancel" style="background:#2a2a4e;border:1px solid #444;color:#fff;padding:8px 16px;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center">Cancel</button>
             <button type="button" data-action="save" style="background:#1a5a8a;border:none;color:#fff;padding:8px 16px;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center" ${initialWebhook ? '' : 'disabled'}>Save</button>
@@ -107,6 +108,7 @@ const Modal = (() => {
     const webhookInput = overlay.querySelector('[data-field="webhook"]');
     const saveBtn = overlay.querySelector('[data-action="save"]');
     const errorArea = overlay.querySelector('[data-error-area]');
+    const statusEl = overlay.querySelector('[data-status]');
 
     // Enable/disable Save based on webhook
     webhookInput.addEventListener('input', () => {
@@ -123,7 +125,9 @@ const Modal = (() => {
 
     saveBtn.addEventListener('click', async () => {
       saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving...';
       errorArea.style.display = 'none';
+      statusEl.style.display = 'none';
 
       const webhook = webhookInput.value.trim();
       const selectedWorldIds = new Set(
@@ -134,12 +138,23 @@ const Modal = (() => {
 
       GM_setValue('discordWebhook', webhook);
 
+      const onProgress = ({ phase, completed, total }) => {
+        statusEl.style.display = 'block';
+        if (phase === 'creating') {
+          statusEl.textContent = `Creating alert ${completed} of ${total}...`;
+        } else {
+          statusEl.textContent = `Removing old alert ${completed} of ${total}...`;
+        }
+      };
+
       try {
-        await onSave({ name, webhook, trigger, selectedWorldIds });
+        await onSave({ name, webhook, trigger, selectedWorldIds }, onProgress);
         closeModal();
       } catch (err) {
+        statusEl.style.display = 'none';
         errorArea.textContent = err.message;
         errorArea.style.display = 'block';
+        saveBtn.textContent = 'Save';
         saveBtn.disabled = false;
       }
     });
