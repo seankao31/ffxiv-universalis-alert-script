@@ -381,9 +381,8 @@ const MarketPage = (() => {
   function _SaveOps() { return typeof SaveOps !== 'undefined' ? SaveOps : _saveOpsModule; }
   function _WorldMap() { return typeof WorldMap !== 'undefined' ? WorldMap : _worldMapModule; }
 
-  function findNativeAlertsButton() {
-    const byText = [...document.querySelectorAll('button')].find(b => b.textContent.includes('Alerts'));
-    return byText || null;
+  function findButtonBar() {
+    return document.querySelector('.box_flex.form');
   }
 
   function readItemName() {
@@ -394,9 +393,6 @@ const MarketPage = (() => {
   function injectMarketButton(itemId) {
     if (document.getElementById('univ-alert-btn')) return; // idempotent
 
-    const native = findNativeAlertsButton();
-    if (native) native.style.display = 'none';
-
     const btn = document.createElement('button');
     btn.id = 'univ-alert-btn';
     btn.textContent = '🔔 Set Alerts';
@@ -404,9 +400,9 @@ const MarketPage = (() => {
 
     btn.addEventListener('click', () => handleAlertButtonClick(itemId, readItemName()));
 
-    const insertAfter = native || document.querySelector('button');
-    if (insertAfter) {
-      insertAfter.insertAdjacentElement('afterend', btn);
+    const bar = findButtonBar();
+    if (bar) {
+      bar.appendChild(btn);
     } else {
       document.body.appendChild(btn);
     }
@@ -452,7 +448,7 @@ const MarketPage = (() => {
 
   function init() {
     function attempt() {
-      if (!document.querySelector('h1')) return false;
+      if (!findButtonBar()) return false;
       const pathParts = window.location.pathname.split('/');
       if (pathParts.length !== 3) return true; // not a /market/{id} page, but done waiting
       const itemId = Number(pathParts[2]);

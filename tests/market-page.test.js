@@ -13,19 +13,18 @@ beforeEach(() => {
 });
 
 describe('injectMarketButton', () => {
-  function setupDOM(hasNativeButton = true) {
+  function setupDOM({ buttonBar = true } = {}) {
     document.body.innerHTML = `
       <h1 class="item-name">木棉原木</h1>
-      ${hasNativeButton ? '<button>Alerts</button>' : ''}
+      ${buttonBar ? '<div class="box_flex form"><button class="btn_addto_list">提醒</button></div>' : ''}
     `;
   }
 
-  test('hides native Alerts button', () => {
+  test('appends button to the button bar', () => {
     setupDOM();
     MarketPage.injectMarketButton(44015);
-    const native = [...document.querySelectorAll('button')].find(b => b.textContent.includes('Alerts'));
-    // Should be hidden (display:none or visibility:hidden) or removed
-    expect(native?.style.display).toBe('none');
+    const bar = document.querySelector('.box_flex.form');
+    expect(bar.querySelector('#univ-alert-btn')).not.toBeNull();
   });
 
   test('injects custom button with id univ-alert-btn', () => {
@@ -39,6 +38,12 @@ describe('injectMarketButton', () => {
     MarketPage.injectMarketButton(44015);
     MarketPage.injectMarketButton(44015);
     expect(document.querySelectorAll('#univ-alert-btn')).toHaveLength(1);
+  });
+
+  test('falls back to document.body when button bar is absent', () => {
+    setupDOM({ buttonBar: false });
+    MarketPage.injectMarketButton(44015);
+    expect(document.getElementById('univ-alert-btn')).not.toBeNull();
   });
 });
 
