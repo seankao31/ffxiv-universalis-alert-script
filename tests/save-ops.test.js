@@ -101,11 +101,21 @@ describe('executeSaveOps', () => {
     expect(firstDelete).toBeGreaterThan(lastPost);
   });
 
-  test('throws and skips deletes if any POST fails', async () => {
+  test('throws with world names when a POST fails', async () => {
     jest.spyOn(API, 'createAlert').mockRejectedValue(new Error('Network error'));
     jest.spyOn(API, 'deleteAlert').mockResolvedValue();
-    await expect(executeSaveOps(ops, 44015, formState)).rejects.toThrow();
+    await expect(executeSaveOps(ops, 44015, formState)).rejects.toThrow(
+      'Failed to save alerts for: 利維坦, 鳳凰'
+    );
     expect(API.deleteAlert).not.toHaveBeenCalled();
+  });
+
+  test('throws with world names when a DELETE fails', async () => {
+    jest.spyOn(API, 'createAlert').mockResolvedValue({ id: 'new' });
+    jest.spyOn(API, 'deleteAlert').mockRejectedValue(new Error('500'));
+    await expect(executeSaveOps(ops, 44015, formState)).rejects.toThrow(
+      'Alerts saved, but failed to remove old alerts for: 伊弗利特'
+    );
   });
 
   test('no-op when postsNeeded and deletesAfterSuccess are both empty', async () => {

@@ -80,9 +80,12 @@ const SaveOps = (() => {
         })
       );
 
-      const failures = results.filter(r => r.status === 'rejected');
-      if (failures.length > 0) {
-        throw new Error(`Failed to create ${failures.length} alert(s). No deletions performed.`);
+      const failedIndices = results
+        .map((r, i) => r.status === 'rejected' ? i : -1)
+        .filter(i => i !== -1);
+      if (failedIndices.length > 0) {
+        const names = failedIndices.map(i => ops.postsNeeded[i].worldName || ops.postsNeeded[i].worldId).join(', ');
+        throw new Error(`Failed to save alerts for: ${names}`);
       }
     }
 
@@ -99,9 +102,12 @@ const SaveOps = (() => {
           }
         })
       );
-      const deleteFailures = deleteResults.filter(r => r.status === 'rejected');
-      if (deleteFailures.length > 0) {
-        throw new Error(`Failed to delete ${deleteFailures.length} alert(s). Some alerts may need manual cleanup.`);
+      const failedDeleteIndices = deleteResults
+        .map((r, i) => r.status === 'rejected' ? i : -1)
+        .filter(i => i !== -1);
+      if (failedDeleteIndices.length > 0) {
+        const names = failedDeleteIndices.map(i => ops.deletesAfterSuccess[i].worldName || ops.deletesAfterSuccess[i].worldId).join(', ');
+        throw new Error(`Alerts saved, but failed to remove old alerts for: ${names}. These may need manual cleanup.`);
       }
     }
   }
