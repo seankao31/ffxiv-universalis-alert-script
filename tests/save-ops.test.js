@@ -18,7 +18,7 @@ describe('computeSaveOps', () => {
     name: 'My Alert',
     itemId: 44015,
     trigger,
-    worlds: [{ worldId: 4030, alertId: 'alert-4030' }],
+    worlds: [{ worldId: 4030, alertId: 'alert-4030', worldName: '利維坦' }],
   };
 
   test('newly checked world not in existing group → in postsNeeded', () => {
@@ -28,21 +28,25 @@ describe('computeSaveOps', () => {
 
   test('unchecked world that had existing alert → in deletesAfterSuccess', () => {
     const ops = computeSaveOps(existingGroup, formState([4031]), WORLDS); // 4030 unchecked
-    expect(ops.deletesAfterSuccess).toContain('alert-4030');
+    expect(ops.deletesAfterSuccess).toContainEqual(
+      expect.objectContaining({ alertId: 'alert-4030', worldId: 4030, worldName: '利維坦' })
+    );
     expect(ops.postsNeeded.map(w => w.worldId)).not.toContain(4030);
   });
 
   test('checked world with identical existing alert → no-op (not in either list)', () => {
     const ops = computeSaveOps(existingGroup, formState([4030]), WORLDS);
     expect(ops.postsNeeded.map(w => w.worldId)).not.toContain(4030);
-    expect(ops.deletesAfterSuccess).not.toContain('alert-4030');
+    expect(ops.deletesAfterSuccess.map(d => d.alertId)).not.toContain('alert-4030');
   });
 
   test('checked world with different trigger → in both postsNeeded and deletesAfterSuccess', () => {
     const newTrigger = { ...trigger, comparison: { lt: { target: 200 } } };
     const ops = computeSaveOps(existingGroup, formState([4030], newTrigger), WORLDS);
     expect(ops.postsNeeded.map(w => w.worldId)).toContain(4030);
-    expect(ops.deletesAfterSuccess).toContain('alert-4030');
+    expect(ops.deletesAfterSuccess).toContainEqual(
+      expect.objectContaining({ alertId: 'alert-4030', worldId: 4030, worldName: '利維坦' })
+    );
   });
 
   test('null group (no existing alerts) → all selected worlds in postsNeeded', () => {
@@ -55,7 +59,9 @@ describe('computeSaveOps', () => {
     const state = { ...formState([4030]), name: 'New Name' };
     const ops = computeSaveOps(existingGroup, state, WORLDS);
     expect(ops.postsNeeded.map(w => w.worldId)).toContain(4030);
-    expect(ops.deletesAfterSuccess).toContain('alert-4030');
+    expect(ops.deletesAfterSuccess).toContainEqual(
+      expect.objectContaining({ alertId: 'alert-4030', worldId: 4030, worldName: '利維坦' })
+    );
   });
 });
 
@@ -68,7 +74,7 @@ describe('executeSaveOps', () => {
       { worldId: 4030, worldName: '利維坦' },
       { worldId: 4031, worldName: '鳳凰' },
     ],
-    deletesAfterSuccess: ['old-alert-1'],
+    deletesAfterSuccess: [{ alertId: 'old-alert-1', worldId: 4028, worldName: '伊弗利特' }],
   };
   const formState = {
     name: 'Test',

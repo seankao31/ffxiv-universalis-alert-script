@@ -32,7 +32,7 @@ const SaveOps = (() => {
         postsNeeded.push(world);
       } else if (!isSelected && existing) {
         // Unchecked, had existing alert → DELETE after success
-        deletesAfterSuccess.push(existing.alertId);
+        deletesAfterSuccess.push({ alertId: existing.alertId, worldId: existing.worldId, worldName: existing.worldName || '' });
       } else if (isSelected && existing) {
         const existingTriggerKey = _Grouping.normalizeTrigger(group.trigger);
         const triggerChanged = newTriggerKey !== existingTriggerKey;
@@ -40,7 +40,7 @@ const SaveOps = (() => {
         if (triggerChanged || nameChanged) {
           // Rule or name changed → POST new, DELETE old
           postsNeeded.push(world);
-          deletesAfterSuccess.push(existing.alertId);
+          deletesAfterSuccess.push({ alertId: existing.alertId, worldId: existing.worldId, worldName: existing.worldName || '' });
         }
         // else: identical — no-op
       }
@@ -90,9 +90,9 @@ const SaveOps = (() => {
       const deleteTotal = ops.deletesAfterSuccess.length;
       let deleteCompleted = 0;
       const deleteResults = await Promise.allSettled(
-        ops.deletesAfterSuccess.map(async (id) => {
+        ops.deletesAfterSuccess.map(async (entry) => {
           try {
-            return await _API.deleteAlert(id);
+            return await _API.deleteAlert(entry.alertId);
           } finally {
             deleteCompleted++;
             onProgress?.({ phase: 'removing', completed: deleteCompleted, total: deleteTotal });
