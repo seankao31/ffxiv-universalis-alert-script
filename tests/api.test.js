@@ -1,7 +1,9 @@
+const RateLimit = require('../src/rate-limit');
 const API = require('../src/api');
 
 beforeEach(() => {
   jest.resetAllMocks();
+  RateLimit._reset();
 });
 
 function mockFetch(body, status = 200) {
@@ -17,7 +19,7 @@ describe('getAlerts', () => {
     const alerts = [{ id: '1', itemId: 44015 }];
     mockFetch(alerts);
     const result = await API.getAlerts();
-    expect(global.fetch).toHaveBeenCalledWith('/api/web/alerts');
+    expect(global.fetch).toHaveBeenCalledWith('/api/web/alerts', undefined);
     expect(result).toEqual(alerts);
   });
 

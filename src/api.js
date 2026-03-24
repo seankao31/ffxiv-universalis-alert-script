@@ -1,12 +1,15 @@
 const API = (() => {
+  const _RL = typeof RateLimit !== 'undefined' ? RateLimit : require('./rate-limit');
+  const _fetch = _RL.rateLimitedFetch;
+
   async function getAlerts() {
-    const res = await fetch('/api/web/alerts');
+    const res = await _fetch('/api/web/alerts');
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
   }
 
   async function createAlert(payload) {
-    const res = await fetch('/api/web/alerts', {
+    const res = await _fetch('/api/web/alerts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -16,7 +19,7 @@ const API = (() => {
   }
 
   async function deleteAlert(alertId) {
-    const res = await fetch(`/api/web/alerts/${alertId}`, { method: 'DELETE' });
+    const res = await _fetch(`/api/web/alerts/${alertId}`, { method: 'DELETE' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
   }
 

@@ -5,6 +5,7 @@ const SRC_ORDER = [
   'src/header.js',
   'src/worldmap.js',
   'src/grouping.js',
+  'src/rate-limit.js',
   'src/api.js',
   'src/save-ops.js',
   'src/modal.js',
