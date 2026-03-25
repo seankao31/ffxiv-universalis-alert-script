@@ -262,3 +262,116 @@ describe('executeSaveOps', () => {
     );
   });
 });
+
+// --- executeSaveOps — interleaved execution ---
+describe('executeSaveOps — interleaved execution', () => {
+  beforeEach(() => jest.resetAllMocks());
+
+  const formState = {
+    name: 'Test',
+    webhook: 'https://discord.com/wh',
+    trigger: { filters: [], mapper: 'pricePerUnit', reducer: 'min', comparison: { lt: { target: 130 } } },
+    selectedWorldIds: new Set([4028, 4029, 4030]),
+  };
+
+  test('with ample slots, all POSTs run before any DELETEs', async () => {
+    const ops = {
+      postsNeeded: [
+        { worldId: 4028, worldName: '伊弗利特' },
+        { worldId: 4029, worldName: '迦樓羅' },
+      ],
+      deletesAfterSuccess: [
+        { alertId: 'old-1', worldId: 4028, worldName: '伊弗利特' },
+        { alertId: 'old-2', worldId: 4029, worldName: '迦樓羅' },
+      ],
+    };
+    const callOrder = [];
+    jest.spyOn(API, 'createAlert').mockImplementation(async () => { callOrder.push('post'); return { id: 'x' }; });
+    jest.spyOn(API, 'deleteAlert').mockImplementation(async () => { callOrder.push('delete'); });
+
+    await executeSaveOps(ops, 44015, formState, { availableSlots: 10 });
+
+    const firstDelete = callOrder.indexOf('delete');
+    const lastPost = callOrder.lastIndexOf('post');
+    expect(firstDelete).toBeGreaterThan(lastPost);
+  });
+
+  test('with 0 available slots, deletes run before posts to free capacity', async () => {
+    const ops = {
+      postsNeeded: [
+        { worldId: 4028, worldName: '伊弗利特' },
+        { worldId: 4029, worldName: '迦樓羅' },
+      ],
+      deletesAfterSuccess: [
+        { alertId: 'old-1', worldId: 4028, worldName: '伊弗利特' },
+        { alertId: 'old-2', worldId: 4029, worldName: '迦樓羅' },
+      ],
+    };
+    const callOrder = [];
+    jest.spyOn(API, 'createAlert').mockImplementation(async () => { callOrder.push('post'); return { id: 'x' }; });
+    jest.spyOn(API, 'deleteAlert').mockImplementation(async () => { callOrder.push('delete'); });
+
+    await executeSaveOps(ops, 44015, formState, { availableSlots: 0 });
+
+    // With 0 slots, must delete before posting
+    expect(callOrder[0]).toBe('delete');
+    // All operations complete
+    expect(callOrder.filter(c => c === 'post')).toHaveLength(2);
+    expect(callOrder.filter(c => c === 'delete')).toHaveLength(2);
+  });
+
+  test('with limited slots, interleaves POST and DELETE batches', async () => {
+    // 3 POSTs + 3 DELETEs (replacements), only 1 slot available
+    const ops = {
+      postsNeeded: [
+        { worldId: 4028, worldName: '伊弗利特' },
+        { worldId: 4029, worldName: '迦樓羅' },
+        { worldId: 4030, worldName: '利維坦' },
+      ],
+      deletesAfterSuccess: [
+        { alertId: 'old-1', worldId: 4028, worldName: '伊弗利特' },
+        { alertId: 'old-2', worldId: 4029, worldName: '迦樓羅' },
+        { alertId: 'old-3', worldId: 4030, worldName: '利維坦' },
+      ],
+    };
+    const callOrder = [];
+    jest.spyOn(API, 'createAlert').mockImplementation(async () => { callOrder.push('post'); return { id: 'x' }; });
+    jest.spyOn(API, 'deleteAlert').mockImplementation(async () => { callOrder.push('delete'); });
+
+    await executeSaveOps(ops, 44015, formState, { availableSlots: 1 });
+
+    // Should interleave: post, delete, post, delete, post, delete
+    expect(callOrder).toHaveLength(6);
+    // First action must be a post (we have 1 slot)
+    expect(callOrder[0]).toBe('post');
+    // Verify interleaving pattern
+    expect(callOrder.filter(c => c === 'post')).toHaveLength(3);
+    expect(callOrder.filter(c => c === 'delete')).toHaveLength(3);
+  });
+
+  test('prefers deleting replaced alerts (matched by worldId) over unreplaced ones', async () => {
+    // 2 POSTs for worlds 4028+4029, 3 DELETEs for 4028+4029+4030
+    // 4028 and 4029 are replacements, 4030 is a pure removal
+    const ops = {
+      postsNeeded: [
+        { worldId: 4028, worldName: '伊弗利特' },
+        { worldId: 4029, worldName: '迦樓羅' },
+      ],
+      deletesAfterSuccess: [
+        { alertId: 'old-1', worldId: 4028, worldName: '伊弗利特' },
+        { alertId: 'old-2', worldId: 4029, worldName: '迦樓羅' },
+        { alertId: 'old-3', worldId: 4030, worldName: '利維坦' },
+      ],
+    };
+    const deletedAlertIds = [];
+    jest.spyOn(API, 'createAlert').mockImplementation(async () => ({ id: 'x' }));
+    jest.spyOn(API, 'deleteAlert').mockImplementation(async (alertId) => { deletedAlertIds.push(alertId); });
+
+    // Only 1 slot: post 1, need to delete to continue
+    // After posting 4028, should prefer deleting old-1 (4028, replaced) over old-3 (4030, unreplaced)
+    await executeSaveOps(ops, 44015, formState, { availableSlots: 1 });
+
+    // The pure removal (old-3, worldId 4030) should be deleted last
+    expect(deletedAlertIds[deletedAlertIds.length - 1]).toBe('old-3');
+  });
+});

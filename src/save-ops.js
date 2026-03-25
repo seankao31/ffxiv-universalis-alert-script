@@ -60,63 +60,130 @@ const SaveOps = (() => {
   }
 
   /**
-   * Executes save ops: all POSTs first, then DELETEs only if all POSTs succeed.
-   * Throws if any POST fails (no deletes will have run).
+   * Executes save ops with capacity-aware interleaving.
+   * When slots are limited, interleaves POST and DELETE batches to stay within capacity.
+   * When availableSlots is not provided, defaults to posting all at once (backward compat).
+   * Throws if any POST fails (no further operations will run).
    * @param {object}   ops
    * @param {number}   itemId
    * @param {object}   formState
    * @param {object}   [options]
    * @param {function} [options.onProgress] - called after each request settles: ({ phase, completed, total })
+   * @param {number}   [options.availableSlots] - how many new alerts can be created before hitting capacity
    */
-  async function executeSaveOps(ops, itemId, formState, { onProgress } = {}) {
-    if (ops.postsNeeded.length > 0) {
-      const postTotal = ops.postsNeeded.length;
-      let postCompleted = 0;
-      const results = await Promise.allSettled(
-        ops.postsNeeded.map(async (world) => {
-          try {
-            return await _API.createAlert({
-              name: formState.name,
-              itemId,
-              worldId: world.worldId,
-              discordWebhook: formState.webhook,
-              triggerVersion: 0,
-              trigger: formState.trigger,
-            });
-          } finally {
-            postCompleted++;
-            onProgress?.({ phase: 'creating', completed: postCompleted, total: postTotal });
-          }
-        })
-      );
+  async function executeSaveOps(ops, itemId, formState, { onProgress, availableSlots } = {}) {
+    // Default to unlimited slots when not specified (backward compat)
+    let slots = typeof availableSlots === 'number' ? availableSlots : ops.postsNeeded.length;
 
-      const failedIndices = results
-        .map((r, i) => r.status === 'rejected' ? i : -1)
-        .filter(i => i !== -1);
-      if (failedIndices.length > 0) {
-        const names = failedIndices.map(i => ops.postsNeeded[i].worldName || ops.postsNeeded[i].worldId).join(', ');
-        throw new Error(`Failed to save alerts for: ${names}`);
+    const pendingPosts = ops.postsNeeded.map((world, i) => ({ world, index: i }));
+    const pendingDeletes = [...ops.deletesAfterSuccess];
+    const postedWorldIds = new Set();
+    const totalPosts = ops.postsNeeded.length;
+    const totalDeletes = ops.deletesAfterSuccess.length;
+    let postCompleted = 0;
+    let deleteCompleted = 0;
+
+    while (pendingPosts.length > 0 || pendingDeletes.length > 0) {
+      // Phase 1: POST as many as slots allow
+      const postBatchSize = Math.min(pendingPosts.length, slots);
+      if (postBatchSize > 0) {
+        const batch = pendingPosts.splice(0, postBatchSize);
+        const results = await Promise.allSettled(
+          batch.map(async ({ world }) => {
+            try {
+              return await _API.createAlert({
+                name: formState.name,
+                itemId,
+                worldId: world.worldId,
+                discordWebhook: formState.webhook,
+                triggerVersion: 0,
+                trigger: formState.trigger,
+              });
+            } finally {
+              postCompleted++;
+              onProgress?.({ phase: 'creating', completed: postCompleted, total: totalPosts });
+            }
+          })
+        );
+
+        const failedIndices = results
+          .map((r, i) => r.status === 'rejected' ? i : -1)
+          .filter(i => i !== -1);
+        if (failedIndices.length > 0) {
+          const names = failedIndices.map(i => batch[i].world.worldName || batch[i].world.worldId).join(', ');
+          throw new Error(`Failed to save alerts for: ${names}`);
+        }
+
+        // Track which worlds have been successfully posted
+        for (const { world } of batch) {
+          postedWorldIds.add(world.worldId);
+        }
+        slots -= batch.length;
       }
-    }
 
-    if (ops.deletesAfterSuccess.length > 0) {
-      const deleteTotal = ops.deletesAfterSuccess.length;
-      let deleteCompleted = 0;
+      // If no more POSTs needed, break to final DELETE phase
+      if (pendingPosts.length === 0) break;
+
+      // Phase 2: Need more slots — DELETE to free capacity
+      // Prefer "safe" deletes: old alerts whose replacements have been POSTed
+      pendingDeletes.sort((a, b) => {
+        const aReplaced = postedWorldIds.has(a.worldId) ? 0 : 1;
+        const bReplaced = postedWorldIds.has(b.worldId) ? 0 : 1;
+        return aReplaced - bReplaced;
+      });
+
+      // Delete enough to make room for remaining POSTs (at least 1)
+      const deleteBatchSize = Math.min(pendingDeletes.length, pendingPosts.length);
+      if (deleteBatchSize === 0) break; // safety: no deletes possible, avoid infinite loop
+
+      const deleteBatch = pendingDeletes.splice(0, deleteBatchSize);
       const deleteResults = await Promise.allSettled(
-        ops.deletesAfterSuccess.map(async (entry) => {
+        deleteBatch.map(async (entry) => {
           try {
             return await _API.deleteAlert(entry.alertId);
           } finally {
             deleteCompleted++;
-            onProgress?.({ phase: 'removing', completed: deleteCompleted, total: deleteTotal });
+            onProgress?.({ phase: 'removing', completed: deleteCompleted, total: totalDeletes });
           }
         })
       );
+
       const failedDeleteIndices = deleteResults
         .map((r, i) => r.status === 'rejected' ? i : -1)
         .filter(i => i !== -1);
       if (failedDeleteIndices.length > 0) {
-        const names = failedDeleteIndices.map(i => ops.deletesAfterSuccess[i].worldName || ops.deletesAfterSuccess[i].worldId).join(', ');
+        const names = failedDeleteIndices.map(i => deleteBatch[i].worldName || deleteBatch[i].worldId).join(', ');
+        throw new Error(`Alerts saved, but failed to remove old alerts for: ${names}. These may need manual cleanup.`);
+      }
+
+      slots += deleteBatch.length;
+    }
+
+    // Final phase: delete remaining old alerts (pure removals + remaining replacements)
+    if (pendingDeletes.length > 0) {
+      // Sort: replaced alerts first (safe), unreplaced last
+      pendingDeletes.sort((a, b) => {
+        const aReplaced = postedWorldIds.has(a.worldId) ? 0 : 1;
+        const bReplaced = postedWorldIds.has(b.worldId) ? 0 : 1;
+        return aReplaced - bReplaced;
+      });
+
+      const deleteResults = await Promise.allSettled(
+        pendingDeletes.map(async (entry) => {
+          try {
+            return await _API.deleteAlert(entry.alertId);
+          } finally {
+            deleteCompleted++;
+            onProgress?.({ phase: 'removing', completed: deleteCompleted, total: totalDeletes });
+          }
+        })
+      );
+
+      const failedDeleteIndices = deleteResults
+        .map((r, i) => r.status === 'rejected' ? i : -1)
+        .filter(i => i !== -1);
+      if (failedDeleteIndices.length > 0) {
+        const names = failedDeleteIndices.map(i => pendingDeletes[i].worldName || pendingDeletes[i].worldId).join(', ');
         throw new Error(`Alerts saved, but failed to remove old alerts for: ${names}. These may need manual cleanup.`);
       }
     }
