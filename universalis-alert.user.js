@@ -6,7 +6,7 @@
 // @description  Multi-world bulk alert creation and management for Universalis
 // @author       You
 // @match        https://universalis.app/market/*
-// @match        https://universalis.app/account/alerts
+// @match        https://universalis.app/account/*
 // @grant        GM_getValue
 // @grant        GM_setValue
 // ==/UserScript==
@@ -825,6 +825,24 @@ const AlertsPage = (() => {
     return map;
   }
 
+  async function fetchItemNames() {
+    try {
+      const res = await fetch('/account/alerts');
+      if (!res.ok) return new Map();
+      const html = await res.text();
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      const map = new Map();
+      doc.querySelectorAll('a[href^="/market/"]').forEach(a => {
+        const parts = a.getAttribute('href').split('/');
+        const itemId = Number(parts[2]);
+        if (!isNaN(itemId)) map.set(itemId, a.textContent.trim());
+      });
+      return map;
+    } catch {
+      return new Map();
+    }
+  }
+
   function formatRule(trigger) {
     const comparator = 'lt' in trigger.comparison ? '<' : '>';
     const target = trigger.comparison[Object.keys(trigger.comparison)[0]].target;
@@ -834,11 +852,7 @@ const AlertsPage = (() => {
     return trigger.filters.includes('hq') ? `${label} <span style="background:#4a8a4a;border-radius:3px;padding:0 4px;font-size:11px">HQ</span>` : label;
   }
 
-  function renderAlertsPanel(alerts, nameMap) {
-    // Remove stale panel if present
-    const existing = document.getElementById('univ-alert-panel');
-    if (existing) existing.remove();
-
+  function renderAlertsPanel(alerts, nameMap, container) {
     const groups = _Grouping().groupAlerts(alerts);
     // Enrich groups with worldName
     groups.forEach(g => {
@@ -945,18 +959,17 @@ const AlertsPage = (() => {
             const latestGroup = refetchedGroups.find(g => normalizeTrigger(g.trigger) === originalTriggerKey) || null;
             const ops = _SaveOps().computeSaveOps(latestGroup, formState, _WorldMap().WORLDS);
             await _SaveOps().executeSaveOps(ops, group.itemId, formState, { onProgress });
-            // Refresh panel after save
+            // Refresh panel after save — reuse closed-over nameMap and container
             const updatedAlerts = await _API().getAlerts();
-            const updatedNames = scrapeItemNames();
-            nameMap.forEach((v, k) => { if (!updatedNames.has(k)) updatedNames.set(k, v); });
-            renderAlertsPanel(updatedAlerts, updatedNames);
+            renderAlertsPanel(updatedAlerts, nameMap, container);
           },
         });
       }
     });
 
-    // Inject panel at top of body
-    document.body.prepend(panel);
+    // Render into container
+    container.innerHTML = '';
+    container.appendChild(panel);
   }
 
   async function deleteGroup(group, onProgress) {
@@ -976,65 +989,84 @@ const AlertsPage = (() => {
     return { failures };
   }
 
-  function init() {
-    // Remove stale panel if user re-navigated
-    const stale = document.getElementById('univ-alert-panel');
-    if (stale) stale.remove();
+  function injectTab() {
+    function inject() {
+      if (document.getElementById('univ-bulk-alerts-tab')) return true; // idempotent
+      const main = document.querySelector('main');
+      if (!main) return false;
+      const navDiv = main.querySelector(':scope > div:first-child');
+      if (!navDiv) return false;
 
-    async function run() {
-      const nameMap = scrapeItemNames();
-
-      // Hide native content
-      document.querySelectorAll('body > *:not(#univ-alert-panel)').forEach(el => {
-        if (el.tagName !== 'SCRIPT' && el.id !== 'univ-alert-panel') el.style.display = 'none';
+      const btn = document.createElement('button');
+      btn.id = 'univ-bulk-alerts-tab';
+      btn.textContent = 'Bulk Alerts';
+      btn.style.cssText = 'background:#1a5a8a;border:none;color:#fff;padding:8px 16px;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;margin-left:8px';
+      btn.addEventListener('click', () => {
+        history.pushState({}, '', '/account/bulk-alerts');
+        init();
       });
+      navDiv.appendChild(btn);
+      return true;
+    }
+
+    if (inject()) return;
+
+    // <main> not yet in DOM — wait for SPA render
+    const observer = new MutationObserver(() => {
+      if (inject()) observer.disconnect();
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
+
+  function init() {
+    function findContentDiv() {
+      const main = document.querySelector('main');
+      if (!main) return null;
+      const divs = main.querySelectorAll(':scope > div');
+      return divs.length >= 2 ? divs[1] : null;
+    }
+
+    async function run(contentDiv) {
+      const nameMap = await fetchItemNames();
 
       let alerts;
       try {
         alerts = await _API().getAlerts();
       } catch {
-        await handleInitError();
-        // Restore native content
-        document.querySelectorAll('body > *:not(#univ-alert-panel)').forEach(el => { el.style.display = ''; });
+        await handleInitError(contentDiv);
         return;
       }
 
-      renderAlertsPanel(alerts, nameMap);
+      renderAlertsPanel(alerts, nameMap, contentDiv);
     }
 
-    if (document.querySelector('a[href^="/market/"]')) {
-      run(); // market links already in DOM (SSR/CSR already rendered)
+    const contentDiv = findContentDiv();
+    if (contentDiv) {
+      run(contentDiv);
       return;
     }
 
-    // Not yet rendered — observe for market links (SPA navigation case)
-    const TIMEOUT_MS = 10000;
-    const startedAt = Date.now();
-
+    // <main> not yet rendered — wait for SPA navigation
     const observer = new MutationObserver(() => {
-      if (!document.querySelector('a[href^="/market/"]')) {
-        if (Date.now() - startedAt > TIMEOUT_MS) {
-          observer.disconnect(); // no alerts — leave native page intact
-        }
-        return;
-      }
+      const div = findContentDiv();
+      if (!div) return;
       observer.disconnect();
-      run();
+      run(div);
     });
-
     observer.observe(document.body, { childList: true, subtree: true });
   }
 
   // Exported so it can be tested directly without triggering MutationObserver
-  async function handleInitError() {
+  async function handleInitError(container) {
     const errorEl = document.createElement('div');
     errorEl.dataset.initError = '';
     errorEl.style.cssText = 'color:#ff6b6b;padding:24px;font-size:16px;width:100%';
     errorEl.textContent = 'Failed to load existing alerts — check your connection';
-    document.body.prepend(errorEl);
+    container.innerHTML = '';
+    container.appendChild(errorEl);
   }
 
-  return { init, scrapeItemNames, renderAlertsPanel, deleteGroup, handleInitError };
+  return { init, injectTab, scrapeItemNames, fetchItemNames, renderAlertsPanel, deleteGroup, handleInitError };
 })();
 
 if (typeof module !== 'undefined') module.exports = AlertsPage;
@@ -1047,8 +1079,11 @@ const Init = (() => {
       if (pathname.split('/').length === 3) { // /market/{id} only, not sub-paths
         MarketPage.init();
       }
-    } else if (pathname === '/account/alerts') {
-      AlertsPage.init();
+    } else if (pathname.startsWith('/account/') && pathname.split('/').length === 3) {
+      AlertsPage.injectTab();
+      if (pathname === '/account/bulk-alerts') {
+        AlertsPage.init();
+      }
     }
   }
 
