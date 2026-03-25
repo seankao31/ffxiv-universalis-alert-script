@@ -2,7 +2,7 @@
 const MarketPage = require('../src/market-page');
 
 // Stub globals used by market-page
-global.Modal = { openModal: jest.fn(), closeModal: jest.fn() };
+global.Modal = { openModal: jest.fn(), closeModal: jest.fn(), openBulkModal: jest.fn() };
 global.API = { getAlerts: jest.fn() };
 global.Grouping = require('../src/grouping');
 global.SaveOps = { computeSaveOps: jest.fn(), executeSaveOps: jest.fn() };
@@ -52,58 +52,29 @@ describe('handleAlertButtonClick', () => {
   const alert1 = { id: 'a1', itemId: 44015, worldId: 4030, name: 'Alert', discordWebhook: 'https://wh.com', triggerVersion: 0,
     trigger: { filters: [], mapper: 'pricePerUnit', reducer: 'min', comparison: { lt: { target: 130 } } } };
 
-  test('calls API.getAlerts and opens modal on click', async () => {
+  test('calls API.getAlerts and opens bulk modal on click', async () => {
     API.getAlerts.mockResolvedValue([alert1]);
     await MarketPage.handleAlertButtonClick(44015, '木棉原木');
     expect(API.getAlerts).toHaveBeenCalled();
-    expect(Modal.openModal).toHaveBeenCalled();
+    expect(Modal.openBulkModal).toHaveBeenCalled();
   });
 
-  test('passes multipleGroups=true when item has 2+ distinct groups', async () => {
+  test('passes grouped alerts to openBulkModal', async () => {
     const alert2 = { ...alert1, id: 'a2', trigger: { ...alert1.trigger, comparison: { lt: { target: 200 } } } };
     API.getAlerts.mockResolvedValue([alert1, alert2]);
     await MarketPage.handleAlertButtonClick(44015, '木棉原木');
-    const callArgs = Modal.openModal.mock.calls[0][0];
-    expect(callArgs.multipleGroups).toBe(true);
+    const callArgs = Modal.openBulkModal.mock.calls[0][0];
+    expect(callArgs.groups).toHaveLength(2);
   });
 
   test('shows error message when getAlerts fails', async () => {
     API.getAlerts.mockRejectedValue(new Error('Network error'));
     // Must include #univ-alert-btn so the error element can be inserted after it
-    document.body.innerHTML = '<button id="univ-alert-btn">🔔 Set Alerts</button>';
+    document.body.innerHTML = '<button id="univ-alert-btn">🔔 Bulk Alerts</button>';
     await MarketPage.handleAlertButtonClick(44015, '木棉原木');
-    expect(Modal.openModal).not.toHaveBeenCalled();
+    expect(Modal.openBulkModal).not.toHaveBeenCalled();
     const errorEl = document.getElementById('univ-alert-error');
     expect(errorEl).not.toBeNull();
     expect(errorEl.textContent).toBe('Failed to load existing alerts — check your connection');
-  });
-
-  test('onSave re-fetches alerts before computing ops', async () => {
-    const alert1 = { id: 'a1', itemId: 44015, worldId: 4030, name: 'Alert', discordWebhook: 'https://wh.com', triggerVersion: 0,
-      trigger: { filters: [], mapper: 'pricePerUnit', reducer: 'min', comparison: { lt: { target: 130 } } } };
-    API.getAlerts.mockResolvedValue([alert1]);
-    SaveOps.computeSaveOps.mockReturnValue({ postsNeeded: [], deletesAfterSuccess: [] });
-    SaveOps.executeSaveOps.mockResolvedValue();
-
-    await MarketPage.handleAlertButtonClick(44015, '木棉原木');
-    expect(API.getAlerts).toHaveBeenCalledTimes(1); // initial fetch
-
-    // Invoke onSave
-    const { onSave } = Modal.openModal.mock.calls[0][0];
-    const onProgress = jest.fn();
-    const formState = { name: 'Test', webhook: 'https://wh.com', trigger: alert1.trigger, selectedWorldIds: new Set([4030]) };
-
-    // Return a different set on re-fetch to prove it was called
-    const alert2 = { ...alert1, id: 'a2', worldId: 4031 };
-    API.getAlerts.mockResolvedValue([alert1, alert2]);
-
-    await onSave(formState, onProgress);
-
-    // Should have fetched again inside onSave
-    expect(API.getAlerts).toHaveBeenCalledTimes(2);
-    // onProgress should have been called with 'refreshing' phase
-    expect(onProgress).toHaveBeenCalledWith({ phase: 'refreshing' });
-    // computeSaveOps should have been called with the fresh group (not the stale one)
-    expect(SaveOps.computeSaveOps).toHaveBeenCalled();
   });
 });

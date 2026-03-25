@@ -2,13 +2,11 @@ const MarketPage = (() => {
   const _apiModule = typeof module !== 'undefined' ? require('./api') : null;
   const _modalModule = typeof module !== 'undefined' ? require('./modal') : null;
   const _groupingModule = typeof module !== 'undefined' ? require('./grouping') : null;
-  const _saveOpsModule = typeof module !== 'undefined' ? require('./save-ops') : null;
   const _worldMapModule = typeof module !== 'undefined' ? require('./worldmap') : null;
 
   function _API() { return typeof API !== 'undefined' ? API : _apiModule; }
   function _Modal() { return typeof Modal !== 'undefined' ? Modal : _modalModule; }
   function _Grouping() { return typeof Grouping !== 'undefined' ? Grouping : _groupingModule; }
-  function _SaveOps() { return typeof SaveOps !== 'undefined' ? SaveOps : _saveOpsModule; }
   function _WorldMap() { return typeof WorldMap !== 'undefined' ? WorldMap : _worldMapModule; }
 
   function findButtonBar() {
@@ -25,7 +23,7 @@ const MarketPage = (() => {
 
     const btn = document.createElement('button');
     btn.id = 'univ-alert-btn';
-    btn.textContent = '🔔 Set Alerts';
+    btn.textContent = '🔔 Bulk Alerts';
     btn.style.cssText = 'background:#1a5a8a;border:none;color:#fff;padding:8px 16px;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;margin-left:8px';
 
     btn.addEventListener('click', () => handleAlertButtonClick(itemId, readItemName()));
@@ -55,37 +53,11 @@ const MarketPage = (() => {
 
     const itemAlerts = allAlerts.filter(a => a.itemId === itemId);
     const groups = _Grouping().groupAlerts(itemAlerts);
-
-    // Enrich worlds with worldName
     groups.forEach(g => {
       g.worlds = g.worlds.map(w => ({ ...w, worldName: _WorldMap().worldById(w.worldId)?.worldName || '' }));
     });
 
-    const group = groups[0] || null;
-    const multipleGroups = groups.length > 1;
-
-    _Modal().openModal({
-      itemId,
-      itemName,
-      group,
-      multipleGroups,
-      onSave: async (formState, onProgress) => {
-        onProgress?.({ phase: 'refreshing' });
-        const freshAlerts = await _API().getAlerts();
-        const freshItemAlerts = freshAlerts.filter(a => a.itemId === itemId);
-        const freshGroups = _Grouping().groupAlerts(freshItemAlerts);
-        freshGroups.forEach(g => {
-          g.worlds = g.worlds.map(w => ({ ...w, worldName: _WorldMap().worldById(w.worldId)?.worldName || '' }));
-        });
-        const { normalizeTrigger } = _Grouping();
-        const originalTriggerKey = group ? normalizeTrigger(group.trigger) : null;
-        const freshGroup = originalTriggerKey
-          ? freshGroups.find(g => normalizeTrigger(g.trigger) === originalTriggerKey) || null
-          : null;
-        const ops = _SaveOps().computeSaveOps(freshGroup, formState, _WorldMap().WORLDS);
-        await _SaveOps().executeSaveOps(ops, itemId, formState, { onProgress });
-      },
-    });
+    _Modal().openBulkModal({ itemId, itemName, groups });
   }
 
   function init() {
