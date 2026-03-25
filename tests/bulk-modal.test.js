@@ -145,6 +145,61 @@ describe('openBulkModal — no duplicate deletes after navigation', () => {
   });
 });
 
+describe('openBulkModal — capacity error on save', () => {
+  test('shows capacityError and keeps Save enabled when capacity exceeded', async () => {
+    GM_getValue.mockReturnValue('https://wh.com');
+    API.getAlerts.mockResolvedValue([]);
+    SaveOps.computeSaveOps.mockReturnValue({
+      postsNeeded: [{ worldId: 4028 }],
+      deletesAfterSuccess: [],
+      netChange: 1,
+      capacityError: 'Not enough alert slots (need 1, only 0 available)',
+    });
+
+    Modal.openBulkModal({ groups: [], nameMap, currentItemId: 44015, currentItemName: '木棉原木', alertCount: 0 });
+    const modal = document.querySelector('#univ-alert-modal');
+    modal.querySelector('[data-action="save"]').click();
+    await new Promise(r => setTimeout(r, 10));
+
+    const errorArea = modal.querySelector('[data-error-area]');
+    expect(errorArea.style.display).toBe('block');
+    expect(errorArea.textContent).toContain('Not enough alert slots');
+
+    const saveBtn = modal.querySelector('[data-action="save"]');
+    expect(saveBtn.disabled).toBe(false);
+    expect(saveBtn.textContent).toBe('Save');
+
+    // executeSaveOps should NOT have been called
+    expect(SaveOps.executeSaveOps).not.toHaveBeenCalled();
+  });
+});
+
+describe('openBulkModal — Retry on execution failure', () => {
+  test('changes Save button to Retry after executeSaveOps failure', async () => {
+    GM_getValue.mockReturnValue('https://wh.com');
+    API.getAlerts.mockResolvedValue([]);
+    SaveOps.computeSaveOps.mockReturnValue({
+      postsNeeded: [{ worldId: 4028 }],
+      deletesAfterSuccess: [],
+      netChange: 1,
+      capacityError: null,
+    });
+    SaveOps.executeSaveOps.mockRejectedValue(new Error('Failed to save alerts for: 伊弗利特'));
+
+    Modal.openBulkModal({ groups: [], nameMap, currentItemId: 44015, currentItemName: '木棉原木', alertCount: 0 });
+    const modal = document.querySelector('#univ-alert-modal');
+    modal.querySelector('[data-action="save"]').click();
+    await new Promise(r => setTimeout(r, 10));
+
+    const saveBtn = modal.querySelector('[data-action="save"]');
+    expect(saveBtn.textContent).toBe('Retry');
+    expect(saveBtn.disabled).toBe(false);
+
+    const errorArea = modal.querySelector('[data-error-area]');
+    expect(errorArea.textContent).toContain('Failed to save alerts');
+  });
+});
+
 describe('openBulkModal — delete last group', () => {
   test('transitions to form view when last group deleted and currentItemId set', async () => {
     API.deleteAlert.mockResolvedValue();

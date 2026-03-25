@@ -166,7 +166,7 @@ describe('openBulkModal — save progress', () => {
     expect(statusEl.style.display).toBe('none');
     expect(errorArea.style.display).toBe('block');
     expect(errorArea.textContent).toBe('Save failed');
-    expect(saveBtn.textContent).toBe('Save');
+    expect(saveBtn.textContent).toBe('Retry');
     expect(saveBtn.disabled).toBe(false);
   });
 });

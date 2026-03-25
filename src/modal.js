@@ -174,7 +174,7 @@ const Modal = (() => {
         statusEl.style.display = 'none';
         errorArea.textContent = err.message;
         errorArea.style.display = 'block';
-        saveBtn.textContent = 'Save';
+        saveBtn.textContent = err.isCapacityError ? 'Save' : 'Retry';
         saveBtn.disabled = false;
       }
     });
@@ -309,8 +309,14 @@ const Modal = (() => {
           ? freshGroups.find(g => g.itemId === itemId && normalizeTrigger(g.trigger) === originalTriggerKey) || null
           : null;
 
-        const ops = _SaveOps().computeSaveOps(freshGroup, formState, _WorldMap.WORLDS);
-        await _SaveOps().executeSaveOps(ops, itemId, formState, { onProgress });
+        const ops = _SaveOps().computeSaveOps(freshGroup, formState, _WorldMap.WORLDS, freshAlerts.length);
+        if (ops.capacityError) {
+          const err = new Error(ops.capacityError);
+          err.isCapacityError = true;
+          throw err;
+        }
+        const availableSlots = _SaveOps().MAX_ALERTS - freshAlerts.length;
+        await _SaveOps().executeSaveOps(ops, itemId, formState, { onProgress, availableSlots });
 
         const updatedAlerts = await _API().getAlerts();
         const updatedGroups = _Grouping().groupAlerts(updatedAlerts);
