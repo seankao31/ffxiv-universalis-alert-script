@@ -234,12 +234,14 @@ describe('init — renders into <main> content div', () => {
   function setupAccountDOM() {
     document.body.innerHTML = `
       <main>
-        <div><button>Account</button></div>
-        <div id="content-div"><p>Native content</p></div>
+        <div class="account">
+          <div><button>Account</button></div>
+          <div id="content-div"><p>Native content</p></div>
+        </div>
       </main>`;
   }
 
-  test('renders alerts panel into second div of <main>', async () => {
+  test('renders alerts panel into second div of <main> wrapper', async () => {
     setupAccountDOM();
     const alert1 = { id: 'a1', itemId: 44015, worldId: 4030, name: 'Alert', discordWebhook: 'https://wh.com',
       triggerVersion: 0, trigger: { filters: [], mapper: 'pricePerUnit', reducer: 'min', comparison: { lt: { target: 130 } } } };
@@ -252,7 +254,7 @@ describe('init — renders into <main> content div', () => {
     AlertsPage.init();
     await new Promise(r => setTimeout(r, 0));
 
-    const contentDiv = document.querySelector('main > div:nth-child(2)');
+    const contentDiv = document.querySelector('main > div > div:nth-child(2)');
     expect(contentDiv.querySelector('#univ-alert-panel')).not.toBeNull();
     expect(contentDiv.textContent).toContain('木棉原木');
   });
@@ -268,7 +270,7 @@ describe('init — renders into <main> content div', () => {
     AlertsPage.init();
     await new Promise(r => setTimeout(r, 0));
 
-    const contentDiv = document.querySelector('main > div:nth-child(2)');
+    const contentDiv = document.querySelector('main > div > div:nth-child(2)');
     const errorEl = contentDiv.querySelector('[data-init-error]');
     expect(errorEl).not.toBeNull();
     expect(errorEl.textContent).toContain('Failed to load existing alerts');
@@ -285,7 +287,7 @@ describe('init — renders into <main> content div', () => {
     AlertsPage.init();
     await new Promise(r => setTimeout(r, 0));
 
-    const navDiv = document.querySelector('main > div:first-child');
+    const navDiv = document.querySelector('main > div > div:first-child');
     expect(navDiv.style.display).not.toBe('none');
   });
 
@@ -305,11 +307,11 @@ describe('init — renders into <main> content div', () => {
     btn.click();
     await new Promise(r => setTimeout(r, 0));
 
-    const contentDiv = document.querySelector('main > div:nth-child(2)');
+    const contentDiv = document.querySelector('main > div > div:nth-child(2)');
     expect(contentDiv.querySelector('#univ-alert-panel')).not.toBeNull();
   });
 
-  test('waits for <main> with 2 child divs via MutationObserver', async () => {
+  test('waits for <main> with wrapper and 2 child divs via MutationObserver', async () => {
     document.body.innerHTML = '<div>Loading...</div>';
     fetch.mockResolvedValue({
       ok: true,
@@ -322,14 +324,14 @@ describe('init — renders into <main> content div', () => {
     // No panel yet
     expect(document.querySelector('#univ-alert-panel')).toBeNull();
 
-    // Simulate SPA render — add <main> with 2 child divs
+    // Simulate SPA render — add <main> with wrapper div containing 2 child divs
     const main = document.createElement('main');
-    main.innerHTML = '<div><button>Account</button></div><div></div>';
+    main.innerHTML = '<div class="account"><div><button>Account</button></div><div></div></div>';
     document.body.appendChild(main);
 
     await new Promise(r => setTimeout(r, 0));
 
-    const contentDiv = main.querySelector(':scope > div:nth-child(2)');
+    const contentDiv = main.querySelector('div > div:nth-child(2)');
     expect(contentDiv.querySelector('#univ-alert-panel')).not.toBeNull();
   });
 });
@@ -372,15 +374,17 @@ describe('injectTab', () => {
   function setupAccountDOM() {
     document.body.innerHTML = `
       <main>
-        <div id="nav-div"><button>Account</button><button>Alerts</button></div>
-        <div id="content-div"><p>Page content</p></div>
+        <div class="account">
+          <div id="nav-div"><button>Account</button><button>Alerts</button></div>
+          <div id="content-div"><p>Page content</p></div>
+        </div>
       </main>`;
   }
 
-  test('appends Bulk Alerts button to first div of <main>', () => {
+  test('appends Bulk Alerts button to first div inside wrapper', () => {
     setupAccountDOM();
     AlertsPage.injectTab();
-    const navDiv = document.querySelector('main > div:first-child');
+    const navDiv = document.querySelector('main > div > div:first-child');
     const btn = navDiv.querySelector('#univ-bulk-alerts-tab');
     expect(btn).not.toBeNull();
     expect(btn.textContent).toBe('Bulk Alerts');
@@ -414,9 +418,9 @@ describe('injectTab', () => {
     // Not yet injected
     expect(document.querySelector('#univ-bulk-alerts-tab')).toBeNull();
 
-    // Simulate SPA render — add <main> to DOM
+    // Simulate SPA render — add <main> with wrapper to DOM
     const main = document.createElement('main');
-    main.innerHTML = '<div><button>Account</button></div><div></div>';
+    main.innerHTML = '<div class="account"><div><button>Account</button></div><div></div></div>';
     document.body.appendChild(main);
 
     await new Promise(r => setTimeout(r, 0));

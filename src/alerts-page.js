@@ -190,7 +190,9 @@ const AlertsPage = (() => {
       if (document.getElementById('univ-bulk-alerts-tab')) return true; // idempotent
       const main = document.querySelector('main');
       if (!main) return false;
-      const navDiv = main.querySelector(':scope > div:first-child');
+      const wrapper = main.querySelector(':scope > div');
+      if (!wrapper) return false;
+      const navDiv = wrapper.querySelector(':scope > div:first-child');
       if (!navDiv) return false;
 
       const btn = document.createElement('button');
@@ -218,7 +220,9 @@ const AlertsPage = (() => {
     function findContentDiv() {
       const main = document.querySelector('main');
       if (!main) return null;
-      const divs = main.querySelectorAll(':scope > div');
+      const wrapper = main.querySelector(':scope > div');
+      if (!wrapper) return null;
+      const divs = wrapper.querySelectorAll(':scope > div');
       return divs.length >= 2 ? divs[1] : null;
     }
 
