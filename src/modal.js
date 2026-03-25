@@ -326,37 +326,6 @@ const Modal = (() => {
     }
   }
 
-  function openModal({ itemId, itemName, group, onSave, multipleGroups = false }) {
-    const overlay = document.createElement('div');
-    overlay.id = 'univ-alert-modal';
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:9999';
-
-    const innerContainer = document.createElement('div');
-    innerContainer.style.cssText = 'background:#1a1a2e;border-radius:8px;padding:24px;width:480px;max-height:80vh;overflow-y:auto;color:#fff';
-    overlay.appendChild(innerContainer);
-
-    document.body.appendChild(overlay);
-
-    // Dismiss on Escape
-    const onKeydown = (e) => {
-      if (e.key === 'Escape') closeModal();
-    };
-    document.addEventListener('keydown', onKeydown);
-    overlay._onKeydown = onKeydown; // store for cleanup
-
-    // Dismiss on overlay background click
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) closeModal();
-    });
-
-    const wrappedOnSave = async (formState, onProgress) => {
-      await onSave(formState, onProgress);
-      closeModal();
-    };
-
-    renderFormView(innerContainer, { itemId, itemName, group, onSave: wrappedOnSave, onBack: null, multipleGroups });
-  }
-
   function closeModal() {
     const existing = document.getElementById('univ-alert-modal');
     if (existing) {
@@ -409,7 +378,7 @@ const Modal = (() => {
     }
   }
 
-  return { openModal, closeModal, formatRule, renderListView, handleListDelete, openBulkModal };
+  return { closeModal, formatRule, renderListView, handleListDelete, openBulkModal };
 })();
 
 if (typeof module !== 'undefined') module.exports = Modal;
