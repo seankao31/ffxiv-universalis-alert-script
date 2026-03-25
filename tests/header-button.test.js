@@ -161,4 +161,20 @@ describe('init', () => {
 
     expect(document.getElementById('univ-alert-btn')).not.toBeNull();
   });
+
+  test('does not create duplicate observers when called multiple times with no header', async () => {
+    document.body.innerHTML = '';
+    HeaderButton.init();
+    HeaderButton.init();
+    HeaderButton.init();
+
+    // Simulate header appearing
+    const header = document.createElement('header');
+    header.innerHTML = '<div><div class="header-home"></div><div><div><a href="/account">帳號</a></div><div><button>⚙️</button></div></div></div>';
+    document.body.appendChild(header);
+    await new Promise(r => setTimeout(r, 0));
+
+    // Should only have one button (no duplicates from multiple observers)
+    expect(document.querySelectorAll('#univ-alert-btn')).toHaveLength(1);
+  });
 });

@@ -9,6 +9,8 @@ const HeaderButton = (() => {
   function _Grouping() { return typeof Grouping !== 'undefined' ? Grouping : _groupingModule; }
   function _WorldMap() { return typeof WorldMap !== 'undefined' ? WorldMap : _worldMapModule; }
 
+  let _initObserver = null;
+
   function findAccountSection() {
     const accountLink = document.querySelector('header a[href="/account"]');
     if (!accountLink) return null;
@@ -106,13 +108,15 @@ const HeaderButton = (() => {
       injectButton();
       return;
     }
-    const observer = new MutationObserver(() => {
+    if (_initObserver) return; // already watching
+    _initObserver = new MutationObserver(() => {
       if (findAccountSection()) {
-        observer.disconnect();
+        _initObserver.disconnect();
+        _initObserver = null;
         injectButton();
       }
     });
-    observer.observe(document.body, { childList: true, subtree: true });
+    _initObserver.observe(document.body, { childList: true, subtree: true });
   }
 
   return { init, injectButton, handleClick };
