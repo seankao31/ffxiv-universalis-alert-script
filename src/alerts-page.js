@@ -185,6 +185,35 @@ const AlertsPage = (() => {
     return { failures };
   }
 
+  function injectTab() {
+    function inject() {
+      if (document.getElementById('univ-bulk-alerts-tab')) return true; // idempotent
+      const main = document.querySelector('main');
+      if (!main) return false;
+      const navDiv = main.querySelector(':scope > div:first-child');
+      if (!navDiv) return false;
+
+      const btn = document.createElement('button');
+      btn.id = 'univ-bulk-alerts-tab';
+      btn.textContent = 'Bulk Alerts';
+      btn.style.cssText = 'background:#1a5a8a;border:none;color:#fff;padding:8px 16px;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;margin-left:8px';
+      btn.addEventListener('click', () => {
+        history.pushState({}, '', '/account/bulk-alerts');
+        init();
+      });
+      navDiv.appendChild(btn);
+      return true;
+    }
+
+    if (inject()) return;
+
+    // <main> not yet in DOM — wait for SPA render
+    const observer = new MutationObserver(() => {
+      if (inject()) observer.disconnect();
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
+
   function init() {
     // Remove stale panel if user re-navigated
     const stale = document.getElementById('univ-alert-panel');
@@ -248,7 +277,7 @@ const AlertsPage = (() => {
     container.appendChild(errorEl);
   }
 
-  return { init, scrapeItemNames, fetchItemNames, renderAlertsPanel, deleteGroup, handleInitError };
+  return { init, injectTab, scrapeItemNames, fetchItemNames, renderAlertsPanel, deleteGroup, handleInitError };
 })();
 
 if (typeof module !== 'undefined') module.exports = AlertsPage;

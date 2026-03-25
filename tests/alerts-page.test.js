@@ -301,6 +301,63 @@ describe('fetchItemNames', () => {
   });
 });
 
+describe('injectTab', () => {
+  function setupAccountDOM() {
+    document.body.innerHTML = `
+      <main>
+        <div id="nav-div"><button>Account</button><button>Alerts</button></div>
+        <div id="content-div"><p>Page content</p></div>
+      </main>`;
+  }
+
+  test('appends Bulk Alerts button to first div of <main>', () => {
+    setupAccountDOM();
+    AlertsPage.injectTab();
+    const navDiv = document.querySelector('main > div:first-child');
+    const btn = navDiv.querySelector('#univ-bulk-alerts-tab');
+    expect(btn).not.toBeNull();
+    expect(btn.textContent).toBe('Bulk Alerts');
+  });
+
+  test('is idempotent — second call does not duplicate button', () => {
+    setupAccountDOM();
+    AlertsPage.injectTab();
+    AlertsPage.injectTab();
+    const buttons = document.querySelectorAll('#univ-bulk-alerts-tab');
+    expect(buttons).toHaveLength(1);
+  });
+
+  test('click calls history.pushState to /account/bulk-alerts', () => {
+    setupAccountDOM();
+    window.history.pushState = jest.fn();
+    // Mock fetch and API.getAlerts so the init() triggered by click doesn't error
+    fetch.mockResolvedValue({ ok: true, text: () => Promise.resolve('<html><body></body></html>') });
+    API.getAlerts.mockResolvedValue([]);
+
+    AlertsPage.injectTab();
+    const btn = document.querySelector('#univ-bulk-alerts-tab');
+    btn.click();
+
+    expect(window.history.pushState).toHaveBeenCalledWith({}, '', '/account/bulk-alerts');
+  });
+
+  test('waits for <main> via MutationObserver when not yet in DOM', async () => {
+    document.body.innerHTML = '<div>Loading...</div>';
+    AlertsPage.injectTab();
+    // Not yet injected
+    expect(document.querySelector('#univ-bulk-alerts-tab')).toBeNull();
+
+    // Simulate SPA render — add <main> to DOM
+    const main = document.createElement('main');
+    main.innerHTML = '<div><button>Account</button></div><div></div>';
+    document.body.appendChild(main);
+
+    await new Promise(r => setTimeout(r, 0));
+
+    expect(document.querySelector('#univ-bulk-alerts-tab')).not.toBeNull();
+  });
+});
+
 describe('delete button — retry on partial failure', () => {
   const trigger = { filters: [], mapper: 'pricePerUnit', reducer: 'min', comparison: { lt: { target: 130 } } };
   const alert1 = { id: 'a1', itemId: 44015, worldId: 4030, name: 'My Alert', discordWebhook: 'https://wh.com',
