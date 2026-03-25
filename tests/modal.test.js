@@ -88,17 +88,6 @@ describe('openModal — pre-population from group', () => {
   });
 });
 
-describe('openModal — multi-group notice', () => {
-  test('shows multi-group notice when multipleGroups flag is true', () => {
-    Modal.openModal({ itemId: 44015, itemName: 'Item', group: null, onSave: jest.fn(), multipleGroups: true });
-    expect(document.querySelector('#univ-alert-modal [data-notice="multiple-groups"]')).not.toBeNull();
-  });
-
-  test('no multi-group notice when flag is false', () => {
-    Modal.openModal({ itemId: 44015, itemName: 'Item', group: null, onSave: jest.fn(), multipleGroups: false });
-    expect(document.querySelector('#univ-alert-modal [data-notice="multiple-groups"]')).toBeNull();
-  });
-});
 
 describe('openModal — save progress', () => {
   test('shows status element and updates button text during save', async () => {

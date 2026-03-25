@@ -37,7 +37,7 @@ const Modal = (() => {
     return trigger.filters.includes('hq') ? `${label} <span style="background:#4a8a4a;border-radius:3px;padding:0 4px;font-size:11px">HQ</span>` : label;
   }
 
-  function renderFormView(container, { itemId, itemName, group, onSave, onBack, multipleGroups }) {
+  function renderFormView(container, { itemId, itemName, group, onSave, onBack }) {
     const existingWorldIds = new Set((group?.worlds || []).map(w => w.worldId));
     const existingTrigger = group?.trigger || { filters: [], mapper: 'pricePerUnit', reducer: 'min', comparison: { lt: { target: 0 } } };
     const existingComparator = Object.keys(existingTrigger.comparison)[0]; // 'lt' or 'gt'
@@ -59,11 +59,6 @@ const Modal = (() => {
       </label>`;
     }).join('');
 
-    const multiNotice = multipleGroups
-      ? `<div data-notice="multiple-groups" style="background:#3a2a00;border:1px solid #ff9800;padding:8px;border-radius:4px;margin-bottom:12px;font-size:12px">
-           Multiple alert rules exist for this item. Editing here will only affect this rule. Use the <a href="/account/alerts" style="color:#ff9800">Alerts page</a> to manage all rules.
-         </div>` : '';
-
     const backLink = onBack
       ? `<a href="#" data-action="back" style="color:#aaa;font-size:13px;text-decoration:none;display:inline-block;margin-bottom:12px">\u2190 Back to alerts</a>`
       : '';
@@ -71,7 +66,6 @@ const Modal = (() => {
     container.innerHTML = `
         ${backLink}
         <h3 style="margin:0 0 16px">Set Alerts \u2014 ${itemName}</h3>
-        ${multiNotice}
         <form id="univ-alert-form">
           <div style="margin-bottom:12px">
             <label style="display:block;margin-bottom:4px;font-size:13px">Alert Name</label>
@@ -303,7 +297,7 @@ const Modal = (() => {
         showListView(updatedGroups);
       };
 
-      renderFormView(innerContainer, { itemId, itemName, group, onSave, onBack, multipleGroups: false });
+      renderFormView(innerContainer, { itemId, itemName, group, onSave, onBack });
     }
 
     // --- Initial routing ---
