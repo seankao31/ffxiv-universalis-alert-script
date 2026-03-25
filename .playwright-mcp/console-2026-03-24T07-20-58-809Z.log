@@ -1,0 +1,6 @@
+[    2233ms] [WARNING] Trying getServers #1 at 3:21:01 PM @ https://universalis.app/_next/static/chunks/pages/_app-be51f1edab3a6449.js:0
+[    2441ms] [WARNING] Trying getTimeZones #1 at 3:21:01 PM @ https://universalis.app/_next/static/chunks/pages/_app-be51f1edab3a6449.js:0
+[  105831ms] [ERROR] Failed to load resource: the server responded with a status of 403 () @ https://discord.com/api/v9/apex/experiments?surface=2:0
+[  106109ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://discord.com/api/v9/promotions?locale=en-US&platform=0:0
+[  113006ms] [WARNING] Trying getServers #1 at 3:22:51 PM @ https://universalis.app/_next/static/chunks/pages/_app-be51f1edab3a6449.js:0
+[  113157ms] [WARNING] Trying getTimeZones #1 at 3:22:51 PM @ https://universalis.app/_next/static/chunks/pages/_app-be51f1edab3a6449.js:0

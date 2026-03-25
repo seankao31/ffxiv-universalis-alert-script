@@ -4,8 +4,7 @@
 // @version      1.0.0
 // @description  Multi-world bulk alert creation and management for Universalis
 // @author       You
-// @match        https://universalis.app/market/*
-// @match        https://universalis.app/account/*
+// @match        https://universalis.app/*
 // @grant        GM_getValue
 // @grant        GM_setValue
 // ==/UserScript==

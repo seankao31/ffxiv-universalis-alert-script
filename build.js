@@ -10,7 +10,6 @@ const SRC_ORDER = [
   'src/save-ops.js',
   'src/modal.js',
   'src/market-page.js',
-  'src/alerts-page.js',
   'src/init.js',
 ];
 
