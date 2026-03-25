@@ -193,6 +193,31 @@ describe('modal dismiss — Escape and overlay click', () => {
   });
 });
 
+describe('formatRule', () => {
+  test('formats a basic trigger with lt comparator', () => {
+    const trigger = { filters: [], mapper: 'pricePerUnit', reducer: 'min', comparison: { lt: { target: 130 } } };
+    const result = Modal.formatRule(trigger);
+    expect(result).toContain('Min');
+    expect(result).toContain('price');
+    expect(result).toContain('<');
+    expect(result).toContain('130');
+  });
+
+  test('formats a trigger with gt comparator', () => {
+    const trigger = { filters: [], mapper: 'quantity', reducer: 'max', comparison: { gt: { target: 500 } } };
+    const result = Modal.formatRule(trigger);
+    expect(result).toContain('Max');
+    expect(result).toContain('>');
+    expect(result).toContain('500');
+  });
+
+  test('includes HQ badge when filters contain hq', () => {
+    const trigger = { filters: ['hq'], mapper: 'pricePerUnit', reducer: 'min', comparison: { lt: { target: 130 } } };
+    const result = Modal.formatRule(trigger);
+    expect(result).toContain('HQ');
+  });
+});
+
 describe('closeModal', () => {
   test('removes modal from DOM', () => {
     Modal.openModal({ itemId: 44015, itemName: 'Item', group: null, onSave: jest.fn() });

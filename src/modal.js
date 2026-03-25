@@ -20,6 +20,15 @@ const Modal = (() => {
     };
   }
 
+  function formatRule(trigger) {
+    const comparator = 'lt' in trigger.comparison ? '<' : '>';
+    const target = trigger.comparison[Object.keys(trigger.comparison)[0]].target;
+    const metricLabels = { pricePerUnit: 'Min price', quantity: 'Quantity', total: 'Total' };
+    const reducerLabels = { min: 'Min', max: 'Max', mean: 'Avg' };
+    const label = `${reducerLabels[trigger.reducer] || trigger.reducer} ${metricLabels[trigger.mapper] || trigger.mapper} ${comparator} ${target}`;
+    return trigger.filters.includes('hq') ? `${label} <span style="background:#4a8a4a;border-radius:3px;padding:0 4px;font-size:11px">HQ</span>` : label;
+  }
+
   function renderFormView(container, { itemId, itemName, group, onSave, onBack, multipleGroups }) {
     const existingWorldIds = new Set((group?.worlds || []).map(w => w.worldId));
     const existingTrigger = group?.trigger || { filters: [], mapper: 'pricePerUnit', reducer: 'min', comparison: { lt: { target: 0 } } };
@@ -206,7 +215,7 @@ const Modal = (() => {
     }
   }
 
-  return { openModal, closeModal };
+  return { openModal, closeModal, formatRule };
 })();
 
 if (typeof module !== 'undefined') module.exports = Modal;
