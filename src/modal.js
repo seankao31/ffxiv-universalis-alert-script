@@ -233,8 +233,8 @@ const Modal = (() => {
     container.addEventListener('click', handler);
   }
 
-  function openBulkModal({ itemId, itemName, groups }) {
-    closeModal(); // remove any existing modal
+  function openBulkModal({ groups, nameMap, currentItemId, currentItemName }) {
+    closeModal();
 
     const overlay = document.createElement('div');
     overlay.id = 'univ-alert-modal';
@@ -245,61 +245,66 @@ const Modal = (() => {
     overlay.appendChild(innerContainer);
     document.body.appendChild(overlay);
 
-    // Escape key dismiss
     const onKeydown = (e) => { if (e.key === 'Escape') closeModal(); };
     document.addEventListener('keydown', onKeydown);
     overlay._onKeydown = onKeydown;
-
-    // Overlay click dismiss
     overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
 
-    // --- Navigation functions ---
+    function showEmptyState() {
+      innerContainer.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <h3 style="margin:0;color:#fff">Bulk Alerts</h3>
+          <span data-action="close-empty" style="cursor:pointer;color:#888;font-size:18px">\u2715</span>
+        </div>
+        <p style="color:#888;text-align:center;padding:24px 0">No alerts yet. Navigate to an item page to create one.</p>`;
+      innerContainer.querySelector('[data-action="close-empty"]').addEventListener('click', () => closeModal());
+    }
 
     function showListView(currentGroups) {
       innerContainer.innerHTML = '';
       renderListView(innerContainer, {
-        groups: currentGroups,
-        nameMap: new Map(),
+        groups: currentGroups, nameMap,
+        newAlertDisabled: !currentItemId,
         onEdit: (group) => showFormView(group, currentGroups),
         onDelete: (group, idx, btn) => {
           handleListDelete(group, idx, btn, innerContainer, () => {
-            // All groups deleted — show blank form with no back button
-            showFormView(null, null);
+            if (currentItemId) {
+              showFormView(null, null);
+            } else {
+              showEmptyState();
+            }
           });
         },
         onNew: () => showFormView(null, currentGroups),
         onClose: () => closeModal(),
-        newAlertDisabled: false,
       });
     }
 
     function showFormView(group, currentGroupsForBack) {
       innerContainer.innerHTML = '';
       const onBack = currentGroupsForBack ? () => showListView(currentGroupsForBack) : null;
+      const itemId = group ? group.itemId : currentItemId;
+      const itemName = group ? (nameMap.get(group.itemId) || `Item #${group.itemId}`) : currentItemName;
 
       const onSave = async (formState, onProgress) => {
         onProgress?.({ phase: 'refreshing' });
         const freshAlerts = await _API().getAlerts();
-        const freshItemAlerts = freshAlerts.filter(a => a.itemId === itemId);
-        const freshGroups = _Grouping().groupAlerts(freshItemAlerts);
+        const freshGroups = _Grouping().groupAlerts(freshAlerts);
         freshGroups.forEach(g => {
           g.worlds = g.worlds.map(w => ({ ...w, worldName: _WorldMap.worldById(w.worldId)?.worldName || '' }));
         });
 
-        // Find matching group by trigger key (if editing)
         const normalizeTrigger = _Grouping().normalizeTrigger;
         const originalTriggerKey = group ? normalizeTrigger(group.trigger) : null;
         const freshGroup = originalTriggerKey
-          ? freshGroups.find(g => normalizeTrigger(g.trigger) === originalTriggerKey) || null
+          ? freshGroups.find(g => g.itemId === itemId && normalizeTrigger(g.trigger) === originalTriggerKey) || null
           : null;
 
         const ops = _SaveOps().computeSaveOps(freshGroup, formState, _WorldMap.WORLDS);
         await _SaveOps().executeSaveOps(ops, itemId, formState, { onProgress });
 
-        // After save: re-fetch and return to list view
         const updatedAlerts = await _API().getAlerts();
-        const updatedItemAlerts = updatedAlerts.filter(a => a.itemId === itemId);
-        const updatedGroups = _Grouping().groupAlerts(updatedItemAlerts);
+        const updatedGroups = _Grouping().groupAlerts(updatedAlerts);
         updatedGroups.forEach(g => {
           g.worlds = g.worlds.map(w => ({ ...w, worldName: _WorldMap.worldById(w.worldId)?.worldName || '' }));
         });
@@ -309,9 +314,13 @@ const Modal = (() => {
       renderFormView(innerContainer, { itemId, itemName, group, onSave, onBack });
     }
 
-    // --- Initial routing ---
+    // Initial routing
     if (groups.length === 0) {
-      showFormView(null, null);
+      if (currentItemId) {
+        showFormView(null, null);
+      } else {
+        showEmptyState();
+      }
     } else {
       showListView(groups);
     }
