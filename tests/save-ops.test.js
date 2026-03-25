@@ -374,4 +374,77 @@ describe('executeSaveOps — interleaved execution', () => {
     // The pure removal (old-3, worldId 4030) should be deleted last
     expect(deletedAlertIds[deletedAlertIds.length - 1]).toBe('old-3');
   });
+
+  test('stops after current batch on POST failure mid-interleave', async () => {
+    const ops = {
+      postsNeeded: [
+        { worldId: 4028, worldName: '伊弗利特' },
+        { worldId: 4029, worldName: '迦樓羅' },
+      ],
+      deletesAfterSuccess: [
+        { alertId: 'old-1', worldId: 4028, worldName: '伊弗利特' },
+        { alertId: 'old-2', worldId: 4029, worldName: '迦樓羅' },
+      ],
+    };
+    // First batch: 1 slot → POST 4028 succeeds
+    // After delete old-1 → POST 4029 fails
+    let postCount = 0;
+    jest.spyOn(API, 'createAlert').mockImplementation(async () => {
+      postCount++;
+      if (postCount === 2) throw new Error('Server error');
+      return { id: 'x' };
+    });
+    jest.spyOn(API, 'deleteAlert').mockResolvedValue();
+
+    await expect(executeSaveOps(ops, 44015, formState, { availableSlots: 1 }))
+      .rejects.toThrow('Failed to save alerts for: 迦樓羅');
+
+    // Only 1 delete should have run (to free space for second POST attempt)
+    expect(API.deleteAlert).toHaveBeenCalledTimes(1);
+  });
+
+  test('reports progress across interleaved batches', async () => {
+    const ops = {
+      postsNeeded: [
+        { worldId: 4028, worldName: '伊弗利特' },
+        { worldId: 4029, worldName: '迦樓羅' },
+      ],
+      deletesAfterSuccess: [
+        { alertId: 'old-1', worldId: 4028, worldName: '伊弗利特' },
+        { alertId: 'old-2', worldId: 4029, worldName: '迦樓羅' },
+      ],
+    };
+    jest.spyOn(API, 'createAlert').mockResolvedValue({ id: 'x' });
+    jest.spyOn(API, 'deleteAlert').mockResolvedValue();
+    const progressCalls = [];
+
+    await executeSaveOps(ops, 44015, formState, {
+      availableSlots: 1,
+      onProgress: (p) => progressCalls.push(p),
+    });
+
+    // With 1 slot: post, delete, post, delete — progress should track totals
+    expect(progressCalls).toEqual([
+      { phase: 'creating', completed: 1, total: 2 },
+      { phase: 'removing', completed: 1, total: 2 },
+      { phase: 'creating', completed: 2, total: 2 },
+      { phase: 'removing', completed: 2, total: 2 },
+    ]);
+  });
+
+  test('handles pure deletes with no posts (all worlds unchecked)', async () => {
+    const ops = {
+      postsNeeded: [],
+      deletesAfterSuccess: [
+        { alertId: 'old-1', worldId: 4028, worldName: '伊弗利特' },
+      ],
+    };
+    jest.spyOn(API, 'createAlert').mockResolvedValue({ id: 'x' });
+    jest.spyOn(API, 'deleteAlert').mockResolvedValue();
+
+    await executeSaveOps(ops, 44015, formState, { availableSlots: 0 });
+
+    expect(API.createAlert).not.toHaveBeenCalled();
+    expect(API.deleteAlert).toHaveBeenCalledTimes(1);
+  });
 });
