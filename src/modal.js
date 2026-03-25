@@ -176,8 +176,10 @@ const Modal = (() => {
     });
   }
 
-  function renderListView(container, { itemId, itemName, groups, onEdit, onDelete, onNew, onClose }) {
-    const rows = groups.map((g, idx) => {
+  function renderListView(container, { groups, nameMap, onEdit, onDelete, onNew, onClose, newAlertDisabled }) {
+    const sorted = [...groups].sort((a, b) => a.itemId - b.itemId);
+    const rows = sorted.map((g, idx) => {
+      const itemName = nameMap.get(g.itemId) || `Item #${g.itemId}`;
       const worldPills = g.worlds.map(w =>
         `<span data-world-pill style="background:#1a3a5c;border-radius:12px;padding:2px 8px;font-size:12px;margin:2px;display:inline-block">${w.worldName || w.worldId}</span>`
       ).join('');
@@ -185,7 +187,8 @@ const Modal = (() => {
         <div data-group-row="${idx}" style="background:#2a2a4a;padding:10px;border-radius:4px;margin-bottom:8px">
           <div style="display:flex;justify-content:space-between;align-items:flex-start">
             <div>
-              <div style="font-size:13px;color:#ccc">${formatRule(g.trigger)}</div>
+              <div style="font-size:14px;color:#fff">${itemName} <span style="font-size:11px;color:#888">#${g.itemId}</span></div>
+              <div style="font-size:13px;color:#ccc;margin-top:4px">${formatRule(g.trigger)}</div>
               <div data-world-pills style="margin-top:6px">${worldPills}</div>
             </div>
             <div style="display:flex;gap:6px;flex-shrink:0">
@@ -196,14 +199,18 @@ const Modal = (() => {
         </div>`;
     }).join('');
 
+    const newAlertAttrs = newAlertDisabled
+      ? 'disabled title="Navigate to an item page to create alerts" style="background:#333;border:none;color:#666;padding:8px 20px;border-radius:4px;cursor:not-allowed;display:inline-flex;align-items:center;justify-content:center"'
+      : 'style="background:#1a5a2a;border:none;color:#fff;padding:8px 20px;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center"';
+
     container.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-        <h3 style="margin:0;color:#fff">Bulk Alerts \u2014 ${itemName}</h3>
+        <h3 style="margin:0;color:#fff">Bulk Alerts</h3>
         <span data-action="close" style="cursor:pointer;color:#888;font-size:18px">\u2715</span>
       </div>
       <div data-list-area style="max-height:300px;overflow-y:auto">${rows}</div>
       <div style="border-top:1px solid #333;margin-top:12px;padding-top:12px;text-align:center">
-        <button data-action="new-alert" style="background:#1a5a2a;border:none;color:#fff;padding:8px 20px;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center">New Alert</button>
+        <button data-action="new-alert" ${newAlertAttrs}>New Alert</button>
       </div>`;
 
     // Event delegation — remove stale listener from previous render to avoid duplicates.
@@ -215,9 +222,9 @@ const Modal = (() => {
     const handler = (e) => {
       const action = e.target.dataset.action;
       if (action === 'close') { onClose(); return; }
-      if (action === 'new-alert') { onNew(); return; }
+      if (action === 'new-alert') { if (!newAlertDisabled) onNew(); return; }
       const idx = Number(e.target.dataset.groupIdx);
-      const group = groups[idx];
+      const group = sorted[idx];
       if (!group) return;
       if (action === 'edit') onEdit(group);
       if (action === 'delete') onDelete(group, idx, e.target);
@@ -251,7 +258,8 @@ const Modal = (() => {
     function showListView(currentGroups) {
       innerContainer.innerHTML = '';
       renderListView(innerContainer, {
-        itemId, itemName, groups: currentGroups,
+        groups: currentGroups,
+        nameMap: new Map(),
         onEdit: (group) => showFormView(group, currentGroups),
         onDelete: (group, idx, btn) => {
           handleListDelete(group, idx, btn, innerContainer, () => {
@@ -261,6 +269,7 @@ const Modal = (() => {
         },
         onNew: () => showFormView(null, currentGroups),
         onClose: () => closeModal(),
+        newAlertDisabled: false,
       });
     }
 

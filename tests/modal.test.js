@@ -209,6 +209,9 @@ describe('formatRule', () => {
 
 describe('renderListView', () => {
   const trigger = { filters: [], mapper: 'pricePerUnit', reducer: 'min', comparison: { lt: { target: 130 } } };
+  const trigger2 = { filters: [], mapper: 'quantity', reducer: 'max', comparison: { gt: { target: 500 } } };
+  const nameMap = new Map([[44015, '木棉原木'], [12345, '鐵礦石']]);
+
   const groups = [{
     itemId: 44015, name: 'Alert', discordWebhook: 'https://wh.com', trigger,
     worlds: [
@@ -219,14 +222,13 @@ describe('renderListView', () => {
 
   test('renders one row per alert group', () => {
     const container = document.createElement('div');
-    Modal.renderListView(container, { itemId: 44015, itemName: '木棉原木', groups, onEdit: jest.fn(), onDelete: jest.fn(), onNew: jest.fn(), onClose: jest.fn() });
-    const rows = container.querySelectorAll('[data-group-row]');
-    expect(rows).toHaveLength(1);
+    Modal.renderListView(container, { groups, nameMap, onEdit: jest.fn(), onDelete: jest.fn(), onNew: jest.fn(), onClose: jest.fn(), newAlertDisabled: false });
+    expect(container.querySelectorAll('[data-group-row]')).toHaveLength(1);
   });
 
   test('renders world pills for each group', () => {
     const container = document.createElement('div');
-    Modal.renderListView(container, { itemId: 44015, itemName: '木棉原木', groups, onEdit: jest.fn(), onDelete: jest.fn(), onNew: jest.fn(), onClose: jest.fn() });
+    Modal.renderListView(container, { groups, nameMap, onEdit: jest.fn(), onDelete: jest.fn(), onNew: jest.fn(), onClose: jest.fn(), newAlertDisabled: false });
     const pills = container.querySelectorAll('[data-group-row="0"] [data-world-pill]');
     expect(pills).toHaveLength(2);
     expect(pills[0].textContent).toBe('利維坦');
@@ -235,39 +237,95 @@ describe('renderListView', () => {
 
   test('renders Edit and Delete buttons per group', () => {
     const container = document.createElement('div');
-    Modal.renderListView(container, { itemId: 44015, itemName: '木棉原木', groups, onEdit: jest.fn(), onDelete: jest.fn(), onNew: jest.fn(), onClose: jest.fn() });
+    Modal.renderListView(container, { groups, nameMap, onEdit: jest.fn(), onDelete: jest.fn(), onNew: jest.fn(), onClose: jest.fn(), newAlertDisabled: false });
     expect(container.querySelector('[data-action="edit"]')).not.toBeNull();
     expect(container.querySelector('[data-action="delete"]')).not.toBeNull();
   });
 
-  test('renders "New Alert" button', () => {
+  test('renders item name and ID from nameMap', () => {
     const container = document.createElement('div');
-    Modal.renderListView(container, { itemId: 44015, itemName: '木棉原木', groups, onEdit: jest.fn(), onDelete: jest.fn(), onNew: jest.fn(), onClose: jest.fn() });
-    expect(container.querySelector('[data-action="new-alert"]')).not.toBeNull();
+    Modal.renderListView(container, { groups, nameMap, onEdit: jest.fn(), onDelete: jest.fn(), onNew: jest.fn(), onClose: jest.fn(), newAlertDisabled: false });
+    const row = container.querySelector('[data-group-row="0"]');
+    expect(row.textContent).toContain('木棉原木');
+    expect(row.textContent).toContain('#44015');
+  });
+
+  test('falls back to Item #ID when nameMap has no entry', () => {
+    const container = document.createElement('div');
+    const unknownGroups = [{ ...groups[0], itemId: 99999 }];
+    Modal.renderListView(container, { groups: unknownGroups, nameMap, onEdit: jest.fn(), onDelete: jest.fn(), onNew: jest.fn(), onClose: jest.fn(), newAlertDisabled: false });
+    const row = container.querySelector('[data-group-row="0"]');
+    expect(row.textContent).toContain('Item #99999');
+  });
+
+  test('sorts groups by itemId so same-item alerts cluster together', () => {
+    const container = document.createElement('div');
+    const mixedGroups = [
+      { itemId: 44015, name: 'A2', discordWebhook: 'https://wh.com', trigger: trigger2, worlds: [{ worldId: 4030, alertId: 'a3', worldName: '利維坦' }] },
+      { itemId: 12345, name: 'A1', discordWebhook: 'https://wh.com', trigger, worlds: [{ worldId: 4030, alertId: 'a4', worldName: '利維坦' }] },
+      { itemId: 44015, name: 'A3', discordWebhook: 'https://wh.com', trigger, worlds: [{ worldId: 4031, alertId: 'a5', worldName: '鳳凰' }] },
+    ];
+    Modal.renderListView(container, { groups: mixedGroups, nameMap, onEdit: jest.fn(), onDelete: jest.fn(), onNew: jest.fn(), onClose: jest.fn(), newAlertDisabled: false });
+    const rows = container.querySelectorAll('[data-group-row]');
+    expect(rows).toHaveLength(3);
+    // itemId 12345 first, then two 44015 rows
+    expect(rows[0].textContent).toContain('鐵礦石');
+    expect(rows[1].textContent).toContain('木棉原木');
+    expect(rows[2].textContent).toContain('木棉原木');
+  });
+
+  test('header says "Bulk Alerts" without item-specific suffix', () => {
+    const container = document.createElement('div');
+    Modal.renderListView(container, { groups, nameMap, onEdit: jest.fn(), onDelete: jest.fn(), onNew: jest.fn(), onClose: jest.fn(), newAlertDisabled: false });
+    const header = container.querySelector('h3');
+    expect(header.textContent).toBe('Bulk Alerts');
+  });
+
+  test('"New Alert" button is enabled when newAlertDisabled is false', () => {
+    const container = document.createElement('div');
+    Modal.renderListView(container, { groups, nameMap, onEdit: jest.fn(), onDelete: jest.fn(), onNew: jest.fn(), onClose: jest.fn(), newAlertDisabled: false });
+    const btn = container.querySelector('[data-action="new-alert"]');
+    expect(btn.disabled).toBe(false);
+  });
+
+  test('"New Alert" button is disabled with tooltip when newAlertDisabled is true', () => {
+    const container = document.createElement('div');
+    Modal.renderListView(container, { groups, nameMap, onEdit: jest.fn(), onDelete: jest.fn(), onNew: jest.fn(), onClose: jest.fn(), newAlertDisabled: true });
+    const btn = container.querySelector('[data-action="new-alert"]');
+    expect(btn.disabled).toBe(true);
+    expect(btn.title).toBe('Navigate to an item page to create alerts');
+  });
+
+  test('renders formatted rule text', () => {
+    const container = document.createElement('div');
+    Modal.renderListView(container, { groups, nameMap, onEdit: jest.fn(), onDelete: jest.fn(), onNew: jest.fn(), onClose: jest.fn(), newAlertDisabled: false });
+    expect(container.textContent).toContain('Min');
+    expect(container.textContent).toContain('<');
+    expect(container.textContent).toContain('130');
   });
 
   test('"New Alert" button calls onNew callback', () => {
     const container = document.createElement('div');
     const onNew = jest.fn();
-    Modal.renderListView(container, { itemId: 44015, itemName: '木棉原木', groups, onEdit: jest.fn(), onDelete: jest.fn(), onNew, onClose: jest.fn() });
+    Modal.renderListView(container, { groups, nameMap, onEdit: jest.fn(), onDelete: jest.fn(), onNew, onClose: jest.fn(), newAlertDisabled: false });
     container.querySelector('[data-action="new-alert"]').click();
     expect(onNew).toHaveBeenCalled();
+  });
+
+  test('"New Alert" button does not call onNew when newAlertDisabled is true', () => {
+    const container = document.createElement('div');
+    const onNew = jest.fn();
+    Modal.renderListView(container, { groups, nameMap, onEdit: jest.fn(), onDelete: jest.fn(), onNew, onClose: jest.fn(), newAlertDisabled: true });
+    container.querySelector('[data-action="new-alert"]').click();
+    expect(onNew).not.toHaveBeenCalled();
   });
 
   test('Edit button calls onEdit with the group', () => {
     const container = document.createElement('div');
     const onEdit = jest.fn();
-    Modal.renderListView(container, { itemId: 44015, itemName: '木棉原木', groups, onEdit, onDelete: jest.fn(), onNew: jest.fn(), onClose: jest.fn() });
+    Modal.renderListView(container, { groups, nameMap, onEdit, onDelete: jest.fn(), onNew: jest.fn(), onClose: jest.fn(), newAlertDisabled: false });
     container.querySelector('[data-action="edit"]').click();
     expect(onEdit).toHaveBeenCalledWith(groups[0]);
-  });
-
-  test('renders formatted rule text', () => {
-    const container = document.createElement('div');
-    Modal.renderListView(container, { itemId: 44015, itemName: '木棉原木', groups, onEdit: jest.fn(), onDelete: jest.fn(), onNew: jest.fn(), onClose: jest.fn() });
-    expect(container.textContent).toContain('Min');
-    expect(container.textContent).toContain('<');
-    expect(container.textContent).toContain('130');
   });
 });
 
@@ -286,9 +344,9 @@ describe('list view — delete behavior', () => {
     }];
     const container = document.createElement('div');
     const onDelete = jest.fn();
-    Modal.renderListView(container, { itemId: 44015, itemName: 'Item', groups, onEdit: jest.fn(), onDelete: (group, idx, btn) => {
+    Modal.renderListView(container, { groups, nameMap: new Map([[44015, 'Item']]), onEdit: jest.fn(), onDelete: (group, idx, btn) => {
       Modal.handleListDelete(group, idx, btn, container, jest.fn());
-    }, onNew: jest.fn(), onClose: jest.fn() });
+    }, onNew: jest.fn(), onClose: jest.fn(), newAlertDisabled: false });
 
     const deleteBtn = container.querySelector('[data-action="delete"]');
     deleteBtn.click();
@@ -307,9 +365,9 @@ describe('list view — delete behavior', () => {
       ],
     }];
     const container = document.createElement('div');
-    Modal.renderListView(container, { itemId: 44015, itemName: 'Item', groups, onEdit: jest.fn(), onDelete: (group, idx, btn) => {
+    Modal.renderListView(container, { groups, nameMap: new Map([[44015, 'Item']]), onEdit: jest.fn(), onDelete: (group, idx, btn) => {
       Modal.handleListDelete(group, idx, btn, container, jest.fn());
-    }, onNew: jest.fn(), onClose: jest.fn() });
+    }, onNew: jest.fn(), onClose: jest.fn(), newAlertDisabled: false });
 
     const deleteBtn = container.querySelector('[data-action="delete"]');
     deleteBtn.click();
@@ -338,9 +396,9 @@ describe('list view — queued state', () => {
       worlds: [{ worldId: 4030, alertId: 'a1', worldName: '利維坦' }],
     }];
     const container = document.createElement('div');
-    Modal.renderListView(container, { itemId: 44015, itemName: 'Item', groups, onEdit: jest.fn(), onDelete: (group, idx, btn) => {
+    Modal.renderListView(container, { groups, nameMap: new Map([[44015, 'Item']]), onEdit: jest.fn(), onDelete: (group, idx, btn) => {
       Modal.handleListDelete(group, idx, btn, container, jest.fn());
-    }, onNew: jest.fn(), onClose: jest.fn() });
+    }, onNew: jest.fn(), onClose: jest.fn(), newAlertDisabled: false });
 
     const deleteBtn = container.querySelector('[data-action="delete"]');
     deleteBtn.click();
@@ -357,9 +415,9 @@ describe('list view — queued state', () => {
       worlds: [{ worldId: 4030, alertId: 'a1', worldName: '利維坦' }],
     }];
     const container = document.createElement('div');
-    Modal.renderListView(container, { itemId: 44015, itemName: 'Item', groups, onEdit: jest.fn(), onDelete: (group, idx, btn) => {
+    Modal.renderListView(container, { groups, nameMap: new Map([[44015, 'Item']]), onEdit: jest.fn(), onDelete: (group, idx, btn) => {
       Modal.handleListDelete(group, idx, btn, container, jest.fn());
-    }, onNew: jest.fn(), onClose: jest.fn() });
+    }, onNew: jest.fn(), onClose: jest.fn(), newAlertDisabled: false });
 
     const deleteBtn = container.querySelector('[data-action="delete"]');
     deleteBtn.click();
@@ -376,9 +434,9 @@ describe('list view — queued state', () => {
       worlds: [{ worldId: 4030, alertId: 'a1', worldName: '利維坦' }],
     }];
     const container = document.createElement('div');
-    Modal.renderListView(container, { itemId: 44015, itemName: 'Item', groups, onEdit: jest.fn(), onDelete: (group, idx, btn) => {
+    Modal.renderListView(container, { groups, nameMap: new Map([[44015, 'Item']]), onEdit: jest.fn(), onDelete: (group, idx, btn) => {
       Modal.handleListDelete(group, idx, btn, container, jest.fn());
-    }, onNew: jest.fn(), onClose: jest.fn() });
+    }, onNew: jest.fn(), onClose: jest.fn(), newAlertDisabled: false });
 
     const deleteBtn = container.querySelector('[data-action="delete"]');
     deleteBtn.click();
@@ -399,7 +457,7 @@ describe('list view — no duplicate handlers after re-render', () => {
     }];
     const container = document.createElement('div');
     const onDelete = jest.fn();
-    const opts = { itemId: 44015, itemName: 'Item', groups, onEdit: jest.fn(), onDelete, onNew: jest.fn(), onClose: jest.fn() };
+    const opts = { groups, nameMap: new Map([[44015, 'Item']]), onEdit: jest.fn(), onDelete, onNew: jest.fn(), onClose: jest.fn(), newAlertDisabled: false };
 
     // Render twice on same container (simulates list → form → back → list)
     Modal.renderListView(container, opts);
@@ -416,7 +474,7 @@ describe('list view — no duplicate handlers after re-render', () => {
     }];
     const container = document.createElement('div');
     const onDelete = jest.fn();
-    const opts = { itemId: 44015, itemName: 'Item', groups, onEdit: jest.fn(), onDelete, onNew: jest.fn(), onClose: jest.fn() };
+    const opts = { groups, nameMap: new Map([[44015, 'Item']]), onEdit: jest.fn(), onDelete, onNew: jest.fn(), onClose: jest.fn(), newAlertDisabled: false };
 
     Modal.renderListView(container, opts);
     Modal.renderListView(container, opts);
