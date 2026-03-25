@@ -12,18 +12,20 @@ Universalis enforces a 40-alert-per-account limit. Alerts on different servers c
 
 `MAX_ALERTS = 40` in `SaveOps`.
 
-`computeSaveOps` gains a `currentAlertCount` parameter and returns two new fields:
+New signature: `computeSaveOps(group, formState, worlds, currentAlertCount)`.
+
+It returns two new fields alongside the existing `postsNeeded` and `deletesAfterSuccess`:
 
 - `capacityError` — `null` if the operation fits, or a string like `"Not enough alert slots (need 8, only 3 available)"`
 - `netChange` — `postsNeeded.length - deletesAfterSuccess.length`
 
 Validation rules:
 - **New alerts:** `currentAlertCount + postsNeeded.length > 40` → reject
-- **Edits:** `currentAlertCount + netChange > 40` → reject (interleaving ensures actual count never exceeds 40 mid-operation)
+- **Edits:** `currentAlertCount + netChange > 40` → reject. The interleaving algorithm ensures the final count does not exceed 40; individual API calls within a batch are serialized by `rate-limit.js`, so the server-side count stays consistent. Note: for new alerts `deletesAfterSuccess` is always empty, so both rules produce the same result; they are separated for clarity.
 
 ## Interleaved Execution
 
-`executeSaveOps` receives `availableSlots` (= `40 - currentAlertCount`) and batches operations:
+`executeSaveOps` receives `availableSlots` in its options object (= `40 - currentAlertCount`) and batches operations:
 
 ```
 while (pending POSTs or DELETEs remain):
@@ -38,12 +40,17 @@ After all POSTs done:
   5. DELETE any remaining old alerts
 ```
 
+Note: "parallel within batch" means requests are enqueued concurrently via `Promise.allSettled` but individual API calls are serialized by the existing `rate-limit.js` module. No new throttling logic is needed.
+
 POST-to-DELETE matching uses `worldId` — when a world appears in both `postsNeeded` and `deletesAfterSuccess`, the DELETE is "safe" once its replacement POST succeeds.
+
+**Coverage gap at full capacity:** When `availableSlots` is 0, no POSTs have occurred yet, so there are no "safe" deletes. The fallback deletes old alerts before their replacements exist, creating a brief window where those alerts are missing. This is accepted behavior — the alternative (rejecting all edits at full capacity) would be far worse for the user.
 
 ## Failure & Retry
 
 On failure mid-interleave:
-- Stop immediately, show error with Retry button
+- Stop after the current batch settles — operations within a batch use `Promise.allSettled` (consistent with existing codebase), so in-flight requests in the same batch complete, but no new batches are started
+- Show error with Retry button
 - Error indicates what failed, e.g. `"Failed to save alerts for: 泰坦, 拉姆"`
 
 On Retry:
@@ -63,7 +70,7 @@ Styled as `color:#888; font-size:13px`. Count from `allAlerts.length`, passed th
 
 **Form view — save validation:** When `computeSaveOps` returns `capacityError`, show it in the existing `data-error-area`. Save button stays enabled so user can uncheck worlds and retry.
 
-**Form view — execution failure:** Show error in `data-error-area`, change Save button text to "Retry". Click re-invokes `onSave` (fresh fetch → recompute → execute).
+**Form view — execution failure:** Show error in `data-error-area`, change Save button text to "Retry". Click re-invokes the same `onSave` callback — no separate retry code path needed, since the existing fresh-fetch → recompute → execute flow is already idempotent.
 
 ## Data Flow
 
