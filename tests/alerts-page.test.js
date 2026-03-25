@@ -18,6 +18,13 @@ function setupNativeDOM(items = [{ itemId: 44015, name: '木棉原木' }]) {
   ).join('');
 }
 
+function createContainer() {
+  const container = document.createElement('div');
+  container.id = 'test-container';
+  document.body.appendChild(container);
+  return container;
+}
+
 describe('scrapeItemNames', () => {
   test('extracts itemId→name from native anchor elements', () => {
     setupNativeDOM([{ itemId: 44015, name: '木棉原木' }, { itemId: 99, name: 'Other' }]);
@@ -37,32 +44,32 @@ describe('renderAlertsPanel', () => {
     triggerVersion: 0, trigger: { filters: [], mapper: 'pricePerUnit', reducer: 'min', comparison: { lt: { target: 130 } } } };
 
   test('injects panel with id univ-alert-panel', () => {
-    setupNativeDOM();
+    const container = createContainer();
     const nameMap = new Map([[44015, '木棉原木']]);
-    AlertsPage.renderAlertsPanel([alert1], nameMap);
+    AlertsPage.renderAlertsPanel([alert1], nameMap, container);
     expect(document.getElementById('univ-alert-panel')).not.toBeNull();
   });
 
   test('renders one row per logical alert group', () => {
-    setupNativeDOM();
+    const container = createContainer();
     const alert2 = { ...alert1, id: 'a2', worldId: 4031 }; // same group
     const nameMap = new Map([[44015, '木棉原木']]);
-    AlertsPage.renderAlertsPanel([alert1, alert2], nameMap);
+    AlertsPage.renderAlertsPanel([alert1, alert2], nameMap, container);
     const rows = document.querySelectorAll('#univ-alert-panel [data-group-row]');
     expect(rows).toHaveLength(1);
   });
 
   test('displays "Item #44015" for items not in nameMap', () => {
-    setupNativeDOM([]);
-    AlertsPage.renderAlertsPanel([alert1], new Map());
+    const container = createContainer();
+    AlertsPage.renderAlertsPanel([alert1], new Map(), container);
     expect(document.getElementById('univ-alert-panel').textContent).toContain('Item #44015');
   });
 
-  test('removes existing panel before re-rendering (stale panel cleanup)', () => {
-    setupNativeDOM();
+  test('clears container before re-rendering (stale panel cleanup)', () => {
+    const container = createContainer();
     const nameMap = new Map([[44015, '木棉原木']]);
-    AlertsPage.renderAlertsPanel([alert1], nameMap);
-    AlertsPage.renderAlertsPanel([alert1], nameMap);
+    AlertsPage.renderAlertsPanel([alert1], nameMap, container);
+    AlertsPage.renderAlertsPanel([alert1], nameMap, container);
     expect(document.querySelectorAll('#univ-alert-panel')).toHaveLength(1);
   });
 });
@@ -88,12 +95,12 @@ describe('renderAlertsPanel — edit onSave re-fetch', () => {
     triggerVersion: 0, trigger: { filters: [], mapper: 'pricePerUnit', reducer: 'min', comparison: { lt: { target: 130 } } } };
 
   test('edit onSave re-fetches alerts before computing ops', async () => {
-    setupNativeDOM();
+    const container = createContainer();
     const nameMap = new Map([[44015, '木棉原木']]);
 
     // First render — initial alerts
     API.getAlerts.mockResolvedValue([alert1]);
-    AlertsPage.renderAlertsPanel([alert1], nameMap);
+    AlertsPage.renderAlertsPanel([alert1], nameMap, container);
 
     // Click the edit button
     const editBtn = document.querySelector('#univ-alert-panel [data-action="edit"]');
@@ -124,6 +131,8 @@ describe('renderAlertsPanel — edit onSave re-fetch', () => {
     expect(onProgress).toHaveBeenCalledWith({ phase: 'refreshing' });
     // computeSaveOps should have been called
     expect(SaveOps.computeSaveOps).toHaveBeenCalled();
+    // Panel should have re-rendered in the same container
+    expect(container.querySelector('#univ-alert-panel')).not.toBeNull();
   });
 });
 
@@ -175,9 +184,9 @@ describe('renderAlertsPanel — edit re-fetch failure', () => {
     triggerVersion: 0, trigger: { filters: [], mapper: 'pricePerUnit', reducer: 'min', comparison: { lt: { target: 130 } } } };
 
   test('shows native alert when re-fetch fails on edit click', async () => {
-    setupNativeDOM();
+    const container = createContainer();
     const nameMap = new Map([[44015, '木棉原木']]);
-    AlertsPage.renderAlertsPanel([alert1], nameMap);
+    AlertsPage.renderAlertsPanel([alert1], nameMap, container);
 
     // First getAlerts (edit click re-fetch) fails
     API.getAlerts.mockRejectedValue(new Error('Network error'));
@@ -195,19 +204,19 @@ describe('renderAlertsPanel — edit re-fetch failure', () => {
 
 describe('renderAlertsPanel — formatRule in table', () => {
   test('displays HQ badge for triggers with hq filter', () => {
-    setupNativeDOM();
+    const container = createContainer();
     const hqAlert = { id: 'a1', itemId: 44015, worldId: 4030, name: 'HQ Alert', discordWebhook: 'https://wh.com',
       triggerVersion: 0, trigger: { filters: ['hq'], mapper: 'pricePerUnit', reducer: 'min', comparison: { lt: { target: 100 } } } };
-    AlertsPage.renderAlertsPanel([hqAlert], new Map([[44015, '木棉原木']]));
+    AlertsPage.renderAlertsPanel([hqAlert], new Map([[44015, '木棉原木']]), container);
     const panel = document.getElementById('univ-alert-panel');
     expect(panel.innerHTML).toContain('HQ');
   });
 
   test('displays gt comparator as >', () => {
-    setupNativeDOM();
+    const container = createContainer();
     const gtAlert = { id: 'a1', itemId: 44015, worldId: 4030, name: 'GT Alert', discordWebhook: 'https://wh.com',
       triggerVersion: 0, trigger: { filters: [], mapper: 'quantity', reducer: 'max', comparison: { gt: { target: 500 } } } };
-    AlertsPage.renderAlertsPanel([gtAlert], new Map([[44015, '木棉原木']]));
+    AlertsPage.renderAlertsPanel([gtAlert], new Map([[44015, '木棉原木']]), container);
     const panel = document.getElementById('univ-alert-panel');
     expect(panel.textContent).toContain('>');
     expect(panel.textContent).toContain('500');
@@ -216,10 +225,10 @@ describe('renderAlertsPanel — formatRule in table', () => {
 
 describe('renderAlertsPanel — world name enrichment', () => {
   test('enriches group worlds with worldName from WorldMap', () => {
-    setupNativeDOM();
+    const container = createContainer();
     const alert1 = { id: 'a1', itemId: 44015, worldId: 4030, name: 'Alert', discordWebhook: 'https://wh.com',
       triggerVersion: 0, trigger: { filters: [], mapper: 'pricePerUnit', reducer: 'min', comparison: { lt: { target: 130 } } } };
-    AlertsPage.renderAlertsPanel([alert1], new Map([[44015, '木棉原木']]));
+    AlertsPage.renderAlertsPanel([alert1], new Map([[44015, '木棉原木']]), container);
     const panel = document.getElementById('univ-alert-panel');
     expect(panel.textContent).toContain('利維坦');
   });
@@ -304,9 +313,9 @@ describe('delete button — retry on partial failure', () => {
   const alert3 = { ...alert1, id: 'a3', worldId: 4032 };
 
   test('shows "Queued…" with reduced opacity immediately on delete click', () => {
-    setupNativeDOM();
+    const container = createContainer();
     API.deleteAlert.mockReturnValue(new Promise(() => {})); // never resolves
-    AlertsPage.renderAlertsPanel([alert1, alert2], new Map([[44015, '木棉原木']]));
+    AlertsPage.renderAlertsPanel([alert1, alert2], new Map([[44015, '木棉原木']]), container);
 
     const deleteBtn = document.querySelector('[data-action="delete"]');
     deleteBtn.click();
@@ -317,14 +326,14 @@ describe('delete button — retry on partial failure', () => {
   });
 
   test('shows "Retry (N remaining)" and updates pills on partial delete failure', async () => {
-    setupNativeDOM();
+    const container = createContainer();
     // First delete succeeds, second fails, third fails
     API.deleteAlert
       .mockResolvedValueOnce()
       .mockRejectedValueOnce(new Error('500'))
       .mockRejectedValueOnce(new Error('500'));
 
-    AlertsPage.renderAlertsPanel([alert1, alert2, alert3], new Map([[44015, '木棉原木']]));
+    AlertsPage.renderAlertsPanel([alert1, alert2, alert3], new Map([[44015, '木棉原木']]), container);
 
     const deleteBtn = document.querySelector('[data-action="delete"]');
     deleteBtn.click();
@@ -341,10 +350,10 @@ describe('delete button — retry on partial failure', () => {
   });
 
   test('removes row when all deletes succeed', async () => {
-    setupNativeDOM();
+    const container = createContainer();
     API.deleteAlert.mockResolvedValue();
 
-    AlertsPage.renderAlertsPanel([alert1, alert2], new Map([[44015, '木棉原木']]));
+    AlertsPage.renderAlertsPanel([alert1, alert2], new Map([[44015, '木棉原木']]), container);
 
     const deleteBtn = document.querySelector('[data-action="delete"]');
     const row = deleteBtn.closest('tr');

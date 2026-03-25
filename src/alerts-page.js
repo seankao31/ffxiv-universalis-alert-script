@@ -48,11 +48,7 @@ const AlertsPage = (() => {
     return trigger.filters.includes('hq') ? `${label} <span style="background:#4a8a4a;border-radius:3px;padding:0 4px;font-size:11px">HQ</span>` : label;
   }
 
-  function renderAlertsPanel(alerts, nameMap) {
-    // Remove stale panel if present
-    const existing = document.getElementById('univ-alert-panel');
-    if (existing) existing.remove();
-
+  function renderAlertsPanel(alerts, nameMap, container) {
     const groups = _Grouping().groupAlerts(alerts);
     // Enrich groups with worldName
     groups.forEach(g => {
@@ -159,18 +155,17 @@ const AlertsPage = (() => {
             const latestGroup = refetchedGroups.find(g => normalizeTrigger(g.trigger) === originalTriggerKey) || null;
             const ops = _SaveOps().computeSaveOps(latestGroup, formState, _WorldMap().WORLDS);
             await _SaveOps().executeSaveOps(ops, group.itemId, formState, { onProgress });
-            // Refresh panel after save
+            // Refresh panel after save — reuse closed-over nameMap and container
             const updatedAlerts = await _API().getAlerts();
-            const updatedNames = scrapeItemNames();
-            nameMap.forEach((v, k) => { if (!updatedNames.has(k)) updatedNames.set(k, v); });
-            renderAlertsPanel(updatedAlerts, updatedNames);
+            renderAlertsPanel(updatedAlerts, nameMap, container);
           },
         });
       }
     });
 
-    // Inject panel at top of body
-    document.body.prepend(panel);
+    // Render into container
+    container.innerHTML = '';
+    container.appendChild(panel);
   }
 
   async function deleteGroup(group, onProgress) {
@@ -213,7 +208,10 @@ const AlertsPage = (() => {
         return;
       }
 
-      renderAlertsPanel(alerts, nameMap);
+      // Create a container for the alerts panel and prepend to body
+      const container = document.createElement('div');
+      document.body.prepend(container);
+      renderAlertsPanel(alerts, nameMap, container);
     }
 
     if (document.querySelector('a[href^="/market/"]')) {
