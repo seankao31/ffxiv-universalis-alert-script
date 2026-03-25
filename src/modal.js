@@ -242,7 +242,7 @@ const Modal = (() => {
     container.addEventListener('click', handler);
   }
 
-  function openBulkModal({ groups, nameMap, currentItemId, currentItemName }) {
+  function openBulkModal({ groups, nameMap, currentItemId, currentItemName, alertCount }) {
     closeModal();
 
     const overlay = document.createElement('div');
@@ -269,11 +269,12 @@ const Modal = (() => {
       innerContainer.querySelector('[data-action="close-empty"]').addEventListener('click', () => closeModal());
     }
 
-    function showListView(currentGroups) {
+    function showListView(currentGroups, currentAlertCount) {
       innerContainer.innerHTML = '';
       renderListView(innerContainer, {
         groups: currentGroups, nameMap,
         newAlertDisabled: !currentItemId,
+        alertCount: currentAlertCount,
         onEdit: (group) => showFormView(group, currentGroups),
         onDelete: (group, idx, btn) => {
           handleListDelete(group, idx, btn, innerContainer, () => {
@@ -323,7 +324,7 @@ const Modal = (() => {
         updatedGroups.forEach(g => {
           g.worlds = g.worlds.map(w => ({ ...w, worldName: _WorldMap.worldById(w.worldId)?.worldName || '' }));
         });
-        showListView(updatedGroups);
+        showListView(updatedGroups, updatedAlerts.length);
       };
 
       renderFormView(innerContainer, { itemId, itemName, group, onSave, onBack });
@@ -337,7 +338,7 @@ const Modal = (() => {
         showEmptyState();
       }
     } else {
-      showListView(groups);
+      showListView(groups, alertCount);
     }
   }
 

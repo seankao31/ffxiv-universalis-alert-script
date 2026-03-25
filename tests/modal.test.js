@@ -17,19 +17,19 @@ global.WorldMap = require('../src/worldmap');
 
 describe('openBulkModal — DOM structure', () => {
   test('injects a modal overlay into document.body', () => {
-    Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, '木棉原木']]), currentItemId: 44015, currentItemName: '木棉原木' });
+    Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, '木棉原木']]), currentItemId: 44015, currentItemName: '木棉原木', alertCount: 0 });
     expect(document.querySelector('#univ-alert-modal')).not.toBeNull();
   });
 
   test('renders checkboxes for all 8 陸行鳥 worlds', () => {
-    Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, '木棉原木']]), currentItemId: 44015, currentItemName: '木棉原木' });
+    Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, '木棉原木']]), currentItemId: 44015, currentItemName: '木棉原木', alertCount: 0 });
     const checkboxes = document.querySelectorAll('#univ-alert-modal input[type="checkbox"][data-world-id]');
     expect(checkboxes).toHaveLength(8);
   });
 
   test('Save button is disabled when webhook field is empty', () => {
     GM_getValue.mockReturnValue(undefined);
-    Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item' });
+    Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item', alertCount: 0 });
     const saveBtn = document.querySelector('#univ-alert-modal [data-action="save"]');
     expect(saveBtn.disabled).toBe(true);
   });
@@ -45,7 +45,7 @@ describe('openBulkModal — webhook auto-populate', () => {
   test('priority 1: uses webhook from existing group when present', () => {
     GM_getValue.mockReturnValue('https://gm-stored.com');
     const group = makeGroup('https://from-alert.com');
-    Modal.openBulkModal({ groups: [group], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item' });
+    Modal.openBulkModal({ groups: [group], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item', alertCount: 0 });
     const modal = document.querySelector('#univ-alert-modal');
     modal.querySelector('[data-action="edit"]').click();
     const webhookInput = document.querySelector('#univ-alert-modal input[data-field="webhook"]');
@@ -54,14 +54,14 @@ describe('openBulkModal — webhook auto-populate', () => {
 
   test('priority 2: falls back to GM_getValue when group has no webhook', () => {
     GM_getValue.mockReturnValue('https://gm-stored.com');
-    Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item' });
+    Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item', alertCount: 0 });
     const webhookInput = document.querySelector('#univ-alert-modal input[data-field="webhook"]');
     expect(webhookInput.value).toBe('https://gm-stored.com');
   });
 
   test('priority 3: empty when no group and no GM value', () => {
     GM_getValue.mockReturnValue(undefined);
-    Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item' });
+    Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item', alertCount: 0 });
     const webhookInput = document.querySelector('#univ-alert-modal input[data-field="webhook"]');
     expect(webhookInput.value).toBe('');
   });
@@ -76,7 +76,7 @@ describe('openBulkModal — pre-population from group', () => {
   };
 
   test('pre-checks world checkboxes for worlds in existing group', () => {
-    Modal.openBulkModal({ groups: [group], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item' });
+    Modal.openBulkModal({ groups: [group], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item', alertCount: 0 });
     const modal = document.querySelector('#univ-alert-modal');
     modal.querySelector('[data-action="edit"]').click();
     const cb4030 = document.querySelector('#univ-alert-modal input[data-world-id="4030"]');
@@ -86,7 +86,7 @@ describe('openBulkModal — pre-population from group', () => {
   });
 
   test('pre-fills alert name with group name', () => {
-    Modal.openBulkModal({ groups: [group], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item' });
+    Modal.openBulkModal({ groups: [group], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item', alertCount: 0 });
     const modal = document.querySelector('#univ-alert-modal');
     modal.querySelector('[data-action="edit"]').click();
     const nameInput = document.querySelector('#univ-alert-modal input[data-field="name"]');
@@ -94,7 +94,7 @@ describe('openBulkModal — pre-population from group', () => {
   });
 
   test('falls back to itemName for alert name when group is null', () => {
-    Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, '木棉原木']]), currentItemId: 44015, currentItemName: '木棉原木' });
+    Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, '木棉原木']]), currentItemId: 44015, currentItemName: '木棉原木', alertCount: 0 });
     const nameInput = document.querySelector('#univ-alert-modal input[data-field="name"]');
     expect(nameInput.value).toBe('木棉原木');
   });
@@ -108,7 +108,7 @@ describe('openBulkModal — save progress', () => {
     SaveOps.computeSaveOps.mockReturnValue({ postsNeeded: [], deletesAfterSuccess: [] });
     SaveOps.executeSaveOps.mockReturnValue(new Promise(() => {})); // never resolves — keeps modal open
 
-    Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item' });
+    Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item', alertCount: 0 });
 
     const saveBtn = document.querySelector('#univ-alert-modal [data-action="save"]');
     const statusEl = document.querySelector('#univ-alert-modal [data-status]');
@@ -137,7 +137,7 @@ describe('openBulkModal — save progress', () => {
     GM_getValue.mockReturnValue('https://wh.com');
     API.getAlerts.mockImplementation(() => new Promise(() => {})); // stalls at refreshing phase
 
-    Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item' });
+    Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item', alertCount: 0 });
 
     const saveBtn = document.querySelector('#univ-alert-modal [data-action="save"]');
     const statusEl = document.querySelector('#univ-alert-modal [data-status]');
@@ -154,7 +154,7 @@ describe('openBulkModal — save progress', () => {
     SaveOps.computeSaveOps.mockReturnValue({ postsNeeded: [], deletesAfterSuccess: [] });
     SaveOps.executeSaveOps.mockRejectedValue(new Error('Save failed'));
 
-    Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item' });
+    Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item', alertCount: 0 });
 
     const saveBtn = document.querySelector('#univ-alert-modal [data-action="save"]');
     saveBtn.click();
@@ -173,14 +173,14 @@ describe('openBulkModal — save progress', () => {
 
 describe('modal dismiss — Escape and overlay click', () => {
   test('closes modal on Escape key press', () => {
-    Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item' });
+    Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item', alertCount: 0 });
     expect(document.querySelector('#univ-alert-modal')).not.toBeNull();
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
     expect(document.querySelector('#univ-alert-modal')).toBeNull();
   });
 
   test('closes modal when clicking overlay background', () => {
-    Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item' });
+    Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item', alertCount: 0 });
     const overlay = document.querySelector('#univ-alert-modal');
     expect(overlay).not.toBeNull();
     // Click the overlay itself (not the inner container)
@@ -189,7 +189,7 @@ describe('modal dismiss — Escape and overlay click', () => {
   });
 
   test('does NOT close modal when clicking inside the form container', () => {
-    Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item' });
+    Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item', alertCount: 0 });
     const innerContainer = document.querySelector('#univ-alert-modal > div');
     innerContainer.dispatchEvent(new MouseEvent('click', { bubbles: false }));
     expect(document.querySelector('#univ-alert-modal')).not.toBeNull();
@@ -501,13 +501,13 @@ describe('list view — no duplicate handlers after re-render', () => {
 
 describe('closeModal', () => {
   test('removes modal from DOM', () => {
-    Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item' });
+    Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item', alertCount: 0 });
     Modal.closeModal();
     expect(document.querySelector('#univ-alert-modal')).toBeNull();
   });
 
   test('cleans up Escape keydown listener after close', () => {
-    Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item' });
+    Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item', alertCount: 0 });
     Modal.closeModal();
     // Pressing Escape after close should not throw or cause issues
     expect(() => {
@@ -519,7 +519,7 @@ describe('closeModal', () => {
 describe('renderFormView — Select All / Clear All buttons', () => {
   test('Select All checks all world checkboxes', () => {
     GM_getValue.mockReturnValue('https://wh.com');
-    Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item' });
+    Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item', alertCount: 0 });
     // Clear all first so we can verify Select All works
     document.querySelector('#univ-alert-modal [data-action="clear-all"]').click();
     const checkboxes = document.querySelectorAll('#univ-alert-modal input[data-world-id]');
@@ -531,7 +531,7 @@ describe('renderFormView — Select All / Clear All buttons', () => {
 
   test('Clear All unchecks all world checkboxes', () => {
     GM_getValue.mockReturnValue('https://wh.com');
-    Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item' });
+    Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item', alertCount: 0 });
     // All should be checked by default for new alerts
     const checkboxes = document.querySelectorAll('#univ-alert-modal input[data-world-id]');
     checkboxes.forEach(cb => expect(cb.checked).toBe(true));
@@ -544,7 +544,7 @@ describe('renderFormView — Select All / Clear All buttons', () => {
 describe('renderFormView — webhook input toggles Save button', () => {
   test('typing a webhook enables the Save button', () => {
     GM_getValue.mockReturnValue(undefined); // no saved webhook
-    Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item' });
+    Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item', alertCount: 0 });
     const saveBtn = document.querySelector('#univ-alert-modal [data-action="save"]');
     const webhookInput = document.querySelector('#univ-alert-modal [data-field="webhook"]');
     expect(saveBtn.disabled).toBe(true);
@@ -556,7 +556,7 @@ describe('renderFormView — webhook input toggles Save button', () => {
 
   test('clearing the webhook disables the Save button', () => {
     GM_getValue.mockReturnValue('https://wh.com');
-    Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item' });
+    Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item', alertCount: 0 });
     const saveBtn = document.querySelector('#univ-alert-modal [data-action="save"]');
     const webhookInput = document.querySelector('#univ-alert-modal [data-field="webhook"]');
     expect(saveBtn.disabled).toBe(false);
@@ -569,7 +569,7 @@ describe('renderFormView — webhook input toggles Save button', () => {
 
 describe('renderFormView — Cancel button', () => {
   test('Cancel button closes the modal', () => {
-    Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item' });
+    Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item', alertCount: 0 });
     expect(document.querySelector('#univ-alert-modal')).not.toBeNull();
     document.querySelector('#univ-alert-modal [data-action="cancel"]').click();
     expect(document.querySelector('#univ-alert-modal')).toBeNull();
@@ -585,7 +585,7 @@ describe('renderFormView — trigger field pre-population from group', () => {
   };
 
   test('pre-selects mapper from existing group trigger', () => {
-    Modal.openBulkModal({ groups: [group], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item' });
+    Modal.openBulkModal({ groups: [group], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item', alertCount: 0 });
     const modal = document.querySelector('#univ-alert-modal');
     modal.querySelector('[data-action="edit"]').click();
     const mapper = document.querySelector('#univ-alert-modal [data-field="mapper"]');
@@ -593,7 +593,7 @@ describe('renderFormView — trigger field pre-population from group', () => {
   });
 
   test('pre-selects reducer from existing group trigger', () => {
-    Modal.openBulkModal({ groups: [group], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item' });
+    Modal.openBulkModal({ groups: [group], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item', alertCount: 0 });
     const modal = document.querySelector('#univ-alert-modal');
     modal.querySelector('[data-action="edit"]').click();
     const reducer = document.querySelector('#univ-alert-modal [data-field="reducer"]');
@@ -601,7 +601,7 @@ describe('renderFormView — trigger field pre-population from group', () => {
   });
 
   test('pre-selects comparator from existing group trigger', () => {
-    Modal.openBulkModal({ groups: [group], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item' });
+    Modal.openBulkModal({ groups: [group], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item', alertCount: 0 });
     const modal = document.querySelector('#univ-alert-modal');
     modal.querySelector('[data-action="edit"]').click();
     const comparator = document.querySelector('#univ-alert-modal [data-field="comparator"]');
@@ -609,7 +609,7 @@ describe('renderFormView — trigger field pre-population from group', () => {
   });
 
   test('pre-fills target value from existing group trigger', () => {
-    Modal.openBulkModal({ groups: [group], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item' });
+    Modal.openBulkModal({ groups: [group], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item', alertCount: 0 });
     const modal = document.querySelector('#univ-alert-modal');
     modal.querySelector('[data-action="edit"]').click();
     const target = document.querySelector('#univ-alert-modal [data-field="target"]');
@@ -617,7 +617,7 @@ describe('renderFormView — trigger field pre-population from group', () => {
   });
 
   test('pre-checks HQ checkbox when trigger has hq filter', () => {
-    Modal.openBulkModal({ groups: [group], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item' });
+    Modal.openBulkModal({ groups: [group], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item', alertCount: 0 });
     const modal = document.querySelector('#univ-alert-modal');
     modal.querySelector('[data-action="edit"]').click();
     const hq = document.querySelector('#univ-alert-modal [data-field="hq"]');
@@ -629,7 +629,7 @@ describe('renderFormView — trigger field pre-population from group', () => {
       ...group,
       trigger: { ...group.trigger, filters: [] },
     };
-    Modal.openBulkModal({ groups: [noHqGroup], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item' });
+    Modal.openBulkModal({ groups: [noHqGroup], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item', alertCount: 0 });
     const modal = document.querySelector('#univ-alert-modal');
     modal.querySelector('[data-action="edit"]').click();
     const hq = document.querySelector('#univ-alert-modal [data-field="hq"]');
@@ -645,7 +645,7 @@ describe('renderFormView — Save builds trigger from form and saves webhook', (
     SaveOps.executeSaveOps.mockResolvedValue();
     API.getAlerts.mockResolvedValue([]); // called again after save
 
-    Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item' });
+    Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item', alertCount: 0 });
 
     // Set form fields
     document.querySelector('#univ-alert-modal [data-field="mapper"]').value = 'total';
@@ -672,7 +672,7 @@ describe('renderFormView — Save builds trigger from form and saves webhook', (
     SaveOps.computeSaveOps.mockReturnValue({ postsNeeded: [], deletesAfterSuccess: [] });
     SaveOps.executeSaveOps.mockResolvedValue();
 
-    Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item' });
+    Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item', alertCount: 0 });
 
     document.querySelector('#univ-alert-modal [data-field="name"]').value = 'Custom Name';
     // Clear all, then check just one world
@@ -694,7 +694,7 @@ describe('renderFormView — Save builds trigger from form and saves webhook', (
     SaveOps.computeSaveOps.mockReturnValue({ postsNeeded: [], deletesAfterSuccess: [] });
     SaveOps.executeSaveOps.mockResolvedValue();
 
-    Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item' });
+    Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item', alertCount: 0 });
 
     document.querySelector('#univ-alert-modal [data-action="save"]').click();
     await new Promise(r => setTimeout(r, 10));
@@ -713,7 +713,7 @@ describe('renderFormView — removing progress phase', () => {
       return new Promise(() => {}); // never resolves — keeps modal open
     });
 
-    Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item' });
+    Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item', alertCount: 0 });
 
     document.querySelector('#univ-alert-modal [data-action="save"]').click();
     await new Promise(r => setTimeout(r, 10));

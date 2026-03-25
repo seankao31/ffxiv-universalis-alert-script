@@ -17,14 +17,14 @@ const nameMap = new Map([[44015, '木棉原木']]);
 
 describe('openBulkModal — routing', () => {
   test('opens to form view when groups is empty and currentItemId is set', () => {
-    Modal.openBulkModal({ groups: [], nameMap, currentItemId: 44015, currentItemName: '木棉原木' });
+    Modal.openBulkModal({ groups: [], nameMap, currentItemId: 44015, currentItemName: '木棉原木', alertCount: 0 });
     const modal = document.querySelector('#univ-alert-modal');
     expect(modal.querySelector('[data-field="name"]')).not.toBeNull();
     expect(modal.querySelector('[data-action="new-alert"]')).toBeNull();
   });
 
   test('opens to list view with empty state when groups is empty and no currentItemId', () => {
-    Modal.openBulkModal({ groups: [], nameMap, currentItemId: null, currentItemName: null });
+    Modal.openBulkModal({ groups: [], nameMap, currentItemId: null, currentItemName: null, alertCount: 0 });
     const modal = document.querySelector('#univ-alert-modal');
     expect(modal.querySelector('[data-field="name"]')).toBeNull();
     expect(modal.textContent).toContain('No alerts yet');
@@ -35,7 +35,7 @@ describe('openBulkModal — routing', () => {
       itemId: 44015, name: 'Alert', discordWebhook: 'https://wh.com', trigger,
       worlds: [{ worldId: 4030, alertId: 'a1', worldName: '利維坦' }],
     }];
-    Modal.openBulkModal({ groups, nameMap, currentItemId: 44015, currentItemName: '木棉原木' });
+    Modal.openBulkModal({ groups, nameMap, currentItemId: 44015, currentItemName: '木棉原木', alertCount: 0 });
     const modal = document.querySelector('#univ-alert-modal');
     expect(modal.querySelector('[data-action="new-alert"]')).not.toBeNull();
     expect(modal.querySelector('[data-field="name"]')).toBeNull();
@@ -49,7 +49,7 @@ describe('openBulkModal — navigation', () => {
   }];
 
   test('"New Alert" navigates from list to blank form', () => {
-    Modal.openBulkModal({ groups, nameMap, currentItemId: 44015, currentItemName: '木棉原木' });
+    Modal.openBulkModal({ groups, nameMap, currentItemId: 44015, currentItemName: '木棉原木', alertCount: 0 });
     const modal = document.querySelector('#univ-alert-modal');
     modal.querySelector('[data-action="new-alert"]').click();
     expect(modal.querySelector('[data-field="name"]')).not.toBeNull();
@@ -57,7 +57,7 @@ describe('openBulkModal — navigation', () => {
   });
 
   test('"← Back to alerts" navigates from form to list', () => {
-    Modal.openBulkModal({ groups, nameMap, currentItemId: 44015, currentItemName: '木棉原木' });
+    Modal.openBulkModal({ groups, nameMap, currentItemId: 44015, currentItemName: '木棉原木', alertCount: 0 });
     const modal = document.querySelector('#univ-alert-modal');
     modal.querySelector('[data-action="new-alert"]').click();
     modal.querySelector('[data-action="back"]').click();
@@ -66,7 +66,7 @@ describe('openBulkModal — navigation', () => {
   });
 
   test('Edit button navigates to form pre-filled with group data', () => {
-    Modal.openBulkModal({ groups, nameMap, currentItemId: 44015, currentItemName: '木棉原木' });
+    Modal.openBulkModal({ groups, nameMap, currentItemId: 44015, currentItemName: '木棉原木', alertCount: 0 });
     const modal = document.querySelector('#univ-alert-modal');
     modal.querySelector('[data-action="edit"]').click();
     const nameInput = modal.querySelector('[data-field="name"]');
@@ -75,7 +75,7 @@ describe('openBulkModal — navigation', () => {
   });
 
   test('Edit resolves itemId/itemName from the group via nameMap', () => {
-    Modal.openBulkModal({ groups, nameMap, currentItemId: null, currentItemName: null });
+    Modal.openBulkModal({ groups, nameMap, currentItemId: null, currentItemName: null, alertCount: 0 });
     const modal = document.querySelector('#univ-alert-modal');
     modal.querySelector('[data-action="edit"]').click();
     // Form header should show item name from nameMap
@@ -83,19 +83,19 @@ describe('openBulkModal — navigation', () => {
   });
 
   test('close button dismisses the modal', () => {
-    Modal.openBulkModal({ groups, nameMap, currentItemId: 44015, currentItemName: '木棉原木' });
+    Modal.openBulkModal({ groups, nameMap, currentItemId: 44015, currentItemName: '木棉原木', alertCount: 0 });
     document.querySelector('#univ-alert-modal [data-action="close"]').click();
     expect(document.querySelector('#univ-alert-modal')).toBeNull();
   });
 
   test('Escape dismisses the modal', () => {
-    Modal.openBulkModal({ groups, nameMap, currentItemId: 44015, currentItemName: '木棉原木' });
+    Modal.openBulkModal({ groups, nameMap, currentItemId: 44015, currentItemName: '木棉原木', alertCount: 0 });
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
     expect(document.querySelector('#univ-alert-modal')).toBeNull();
   });
 
   test('overlay background click dismisses the modal', () => {
-    Modal.openBulkModal({ groups, nameMap, currentItemId: 44015, currentItemName: '木棉原木' });
+    Modal.openBulkModal({ groups, nameMap, currentItemId: 44015, currentItemName: '木棉原木', alertCount: 0 });
     const overlay = document.querySelector('#univ-alert-modal');
     overlay.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(document.querySelector('#univ-alert-modal')).toBeNull();
@@ -116,7 +116,7 @@ describe('openBulkModal — form save returns to list', () => {
     SaveOps.executeSaveOps.mockResolvedValue();
     GM_getValue.mockReturnValue('https://wh.com');
 
-    Modal.openBulkModal({ groups, nameMap, currentItemId: 44015, currentItemName: '木棉原木' });
+    Modal.openBulkModal({ groups, nameMap, currentItemId: 44015, currentItemName: '木棉原木', alertCount: 0 });
     const modal = document.querySelector('#univ-alert-modal');
     modal.querySelector('[data-action="new-alert"]').click();
     modal.querySelector('[data-action="save"]').click();
@@ -135,7 +135,7 @@ describe('openBulkModal — no duplicate deletes after navigation', () => {
       worlds: [{ worldId: 4030, alertId: 'a1', worldName: '利維坦' }],
     }];
 
-    Modal.openBulkModal({ groups, nameMap, currentItemId: 44015, currentItemName: '木棉原木' });
+    Modal.openBulkModal({ groups, nameMap, currentItemId: 44015, currentItemName: '木棉原木', alertCount: 0 });
     const modal = document.querySelector('#univ-alert-modal');
     modal.querySelector('[data-action="new-alert"]').click();
     modal.querySelector('[data-action="back"]').click();
@@ -208,7 +208,7 @@ describe('openBulkModal — delete last group', () => {
       worlds: [{ worldId: 4030, alertId: 'a1', worldName: '利維坦' }],
     }];
 
-    Modal.openBulkModal({ groups, nameMap, currentItemId: 44015, currentItemName: '木棉原木' });
+    Modal.openBulkModal({ groups, nameMap, currentItemId: 44015, currentItemName: '木棉原木', alertCount: 0 });
     const modal = document.querySelector('#univ-alert-modal');
     modal.querySelector('[data-action="delete"]').click();
     await new Promise(r => setTimeout(r, 0));
@@ -223,7 +223,7 @@ describe('openBulkModal — delete last group', () => {
       worlds: [{ worldId: 4030, alertId: 'a1', worldName: '利維坦' }],
     }];
 
-    Modal.openBulkModal({ groups, nameMap, currentItemId: null, currentItemName: null });
+    Modal.openBulkModal({ groups, nameMap, currentItemId: null, currentItemName: null, alertCount: 0 });
     const modal = document.querySelector('#univ-alert-modal');
     modal.querySelector('[data-action="delete"]').click();
     await new Promise(r => setTimeout(r, 0));

@@ -123,7 +123,7 @@ const HeaderButton = (() => {
     });
 
     const { currentItemId, currentItemName } = detectPageContext();
-    _Modal().openBulkModal({ groups, nameMap, currentItemId, currentItemName });
+    _Modal().openBulkModal({ groups, nameMap, currentItemId, currentItemName, alertCount: allAlerts.length });
   }
 
   function init() {

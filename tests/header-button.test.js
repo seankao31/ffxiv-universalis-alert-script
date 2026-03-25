@@ -215,6 +215,24 @@ describe('handleClick', () => {
     // nameMap may be empty but modal still opens
   });
 
+  test('passes alertCount to openBulkModal', async () => {
+    setupHeader();
+    delete window.location;
+    window.location = { pathname: '/' };
+
+    const alerts = [
+      { id: 'a1', itemId: 44015, worldId: 4030, name: 'Alert', discordWebhook: 'https://wh.com', triggerVersion: 0, trigger: { filters: [], mapper: 'pricePerUnit', reducer: 'min', comparison: { lt: { target: 130 } } } },
+      { id: 'a2', itemId: 44015, worldId: 4031, name: 'Alert', discordWebhook: 'https://wh.com', triggerVersion: 0, trigger: { filters: [], mapper: 'pricePerUnit', reducer: 'min', comparison: { lt: { target: 130 } } } },
+    ];
+    API.getAlerts.mockResolvedValue(alerts);
+    fetch.mockResolvedValue({ ok: true, text: () => Promise.resolve('<html><body><h1>653 木棉原木</h1></body></html>') });
+
+    await HeaderButton.handleClick();
+
+    const callArgs = Modal.openBulkModal.mock.calls[0][0];
+    expect(callArgs.alertCount).toBe(2);
+  });
+
   test('enriches groups with worldName', async () => {
     setupHeader();
     delete window.location;
