@@ -560,13 +560,13 @@ const Modal = (() => {
         statusEl.style.display = 'none';
         errorArea.textContent = err.message;
         errorArea.style.display = 'block';
-        saveBtn.textContent = 'Save';
+        saveBtn.textContent = err.isCapacityError ? 'Save' : 'Retry';
         saveBtn.disabled = false;
       }
     });
   }
 
-  function renderListView(container, { groups, nameMap, onEdit, onDelete, onNew, onClose, newAlertDisabled }) {
+  function renderListView(container, { groups, nameMap, onEdit, onDelete, onNew, onClose, newAlertDisabled, alertCount }) {
     const sorted = [...groups].sort((a, b) => a.itemId - b.itemId);
     const rows = sorted.map((g, idx) => {
       const itemName = nameMap.get(g.itemId) || `Item #${g.itemId}`;
@@ -593,11 +593,16 @@ const Modal = (() => {
       ? 'disabled title="Navigate to an item page to create alerts" style="background:#333;border:none;color:#666;padding:8px 20px;border-radius:4px;cursor:not-allowed;display:inline-flex;align-items:center;justify-content:center"'
       : 'style="background:#1a5a2a;border:none;color:#fff;padding:8px 20px;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center"';
 
+    const capacityLine = typeof alertCount === 'number'
+      ? `<div style="color:#888;font-size:13px;margin-bottom:12px">Alert slots: ${alertCount} / 40 used</div>`
+      : '';
+
     container.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
         <h3 style="margin:0;color:#fff">Bulk Alerts</h3>
         <span data-action="close" style="cursor:pointer;color:#888;font-size:18px">\u2715</span>
       </div>
+      ${capacityLine}
       <div data-list-area style="max-height:300px;overflow-y:auto">${rows}</div>
       <div style="border-top:1px solid #333;margin-top:12px;padding-top:12px;text-align:center">
         <button data-action="new-alert" ${newAlertAttrs}>New Alert</button>
@@ -623,7 +628,7 @@ const Modal = (() => {
     container.addEventListener('click', handler);
   }
 
-  function openBulkModal({ groups, nameMap, currentItemId, currentItemName }) {
+  function openBulkModal({ groups, nameMap, currentItemId, currentItemName, alertCount }) {
     closeModal();
 
     const overlay = document.createElement('div');
@@ -650,11 +655,12 @@ const Modal = (() => {
       innerContainer.querySelector('[data-action="close-empty"]').addEventListener('click', () => closeModal());
     }
 
-    function showListView(currentGroups) {
+    function showListView(currentGroups, currentAlertCount) {
       innerContainer.innerHTML = '';
       renderListView(innerContainer, {
         groups: currentGroups, nameMap,
         newAlertDisabled: !currentItemId,
+        alertCount: currentAlertCount,
         onEdit: (group) => showFormView(group, currentGroups),
         onDelete: (group, idx, btn) => {
           handleListDelete(group, idx, btn, innerContainer, () => {
@@ -690,15 +696,21 @@ const Modal = (() => {
           ? freshGroups.find(g => g.itemId === itemId && normalizeTrigger(g.trigger) === originalTriggerKey) || null
           : null;
 
-        const ops = _SaveOps().computeSaveOps(freshGroup, formState, _WorldMap.WORLDS);
-        await _SaveOps().executeSaveOps(ops, itemId, formState, { onProgress });
+        const ops = _SaveOps().computeSaveOps(freshGroup, formState, _WorldMap.WORLDS, freshAlerts.length);
+        if (ops.capacityError) {
+          const err = new Error(ops.capacityError);
+          err.isCapacityError = true;
+          throw err;
+        }
+        const availableSlots = _SaveOps().MAX_ALERTS - freshAlerts.length;
+        await _SaveOps().executeSaveOps(ops, itemId, formState, { onProgress, availableSlots });
 
         const updatedAlerts = await _API().getAlerts();
         const updatedGroups = _Grouping().groupAlerts(updatedAlerts);
         updatedGroups.forEach(g => {
           g.worlds = g.worlds.map(w => ({ ...w, worldName: _WorldMap.worldById(w.worldId)?.worldName || '' }));
         });
-        showListView(updatedGroups);
+        showListView(updatedGroups, updatedAlerts.length);
       };
 
       renderFormView(innerContainer, { itemId, itemName, group, onSave, onBack });
@@ -712,7 +724,7 @@ const Modal = (() => {
         showEmptyState();
       }
     } else {
-      showListView(groups);
+      showListView(groups, alertCount);
     }
   }
 
@@ -900,7 +912,7 @@ const HeaderButton = (() => {
     });
 
     const { currentItemId, currentItemName } = detectPageContext();
-    _Modal().openBulkModal({ groups, nameMap, currentItemId, currentItemName });
+    _Modal().openBulkModal({ groups, nameMap, currentItemId, currentItemName, alertCount: allAlerts.length });
   }
 
   function init() {
