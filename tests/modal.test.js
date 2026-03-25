@@ -722,3 +722,31 @@ describe('renderFormView — removing progress phase', () => {
     expect(statusEl.textContent).toBe('Removing old alert 1 of 2...');
   });
 });
+
+describe('renderListView — capacity display', () => {
+  const trigger = { filters: [], mapper: 'pricePerUnit', reducer: 'min', comparison: { lt: { target: 130 } } };
+  const groups = [{
+    itemId: 44015, name: 'Alert', discordWebhook: 'https://wh.com', trigger,
+    worlds: [{ worldId: 4030, alertId: 'a1', worldName: '利維坦' }],
+  }];
+
+  test('displays alert slot usage when alertCount is provided', () => {
+    const container = document.createElement('div');
+    Modal.renderListView(container, {
+      groups, nameMap: new Map([[44015, 'Item']]),
+      onEdit: jest.fn(), onDelete: jest.fn(), onNew: jest.fn(), onClose: jest.fn(),
+      newAlertDisabled: false, alertCount: 24,
+    });
+    expect(container.textContent).toContain('Alert slots: 24 / 40 used');
+  });
+
+  test('displays 0 / 40 when alertCount is 0', () => {
+    const container = document.createElement('div');
+    Modal.renderListView(container, {
+      groups, nameMap: new Map([[44015, 'Item']]),
+      onEdit: jest.fn(), onDelete: jest.fn(), onNew: jest.fn(), onClose: jest.fn(),
+      newAlertDisabled: false, alertCount: 0,
+    });
+    expect(container.textContent).toContain('Alert slots: 0 / 40 used');
+  });
+});

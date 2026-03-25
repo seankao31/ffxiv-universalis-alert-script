@@ -180,7 +180,7 @@ const Modal = (() => {
     });
   }
 
-  function renderListView(container, { groups, nameMap, onEdit, onDelete, onNew, onClose, newAlertDisabled }) {
+  function renderListView(container, { groups, nameMap, onEdit, onDelete, onNew, onClose, newAlertDisabled, alertCount }) {
     const sorted = [...groups].sort((a, b) => a.itemId - b.itemId);
     const rows = sorted.map((g, idx) => {
       const itemName = nameMap.get(g.itemId) || `Item #${g.itemId}`;
@@ -207,11 +207,16 @@ const Modal = (() => {
       ? 'disabled title="Navigate to an item page to create alerts" style="background:#333;border:none;color:#666;padding:8px 20px;border-radius:4px;cursor:not-allowed;display:inline-flex;align-items:center;justify-content:center"'
       : 'style="background:#1a5a2a;border:none;color:#fff;padding:8px 20px;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center"';
 
+    const capacityLine = typeof alertCount === 'number'
+      ? `<div style="color:#888;font-size:13px;margin-bottom:12px">Alert slots: ${alertCount} / 40 used</div>`
+      : '';
+
     container.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
         <h3 style="margin:0;color:#fff">Bulk Alerts</h3>
         <span data-action="close" style="cursor:pointer;color:#888;font-size:18px">\u2715</span>
       </div>
+      ${capacityLine}
       <div data-list-area style="max-height:300px;overflow-y:auto">${rows}</div>
       <div style="border-top:1px solid #333;margin-top:12px;padding-top:12px;text-align:center">
         <button data-action="new-alert" ${newAlertAttrs}>New Alert</button>
