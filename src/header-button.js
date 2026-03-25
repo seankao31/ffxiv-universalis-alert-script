@@ -10,6 +10,25 @@ const HeaderButton = (() => {
   function _WorldMap() { return typeof WorldMap !== 'undefined' ? WorldMap : _worldMapModule; }
 
   let _initObserver = null;
+  let _nameCache;
+
+  function _loadNameCache() {
+    _nameCache = new Map();
+    try {
+      const raw = GM_getValue('nameCache', '{}');
+      const obj = JSON.parse(raw);
+      for (const [k, v] of Object.entries(obj)) {
+        _nameCache.set(Number(k), v);
+      }
+    } catch { /* corrupt data — start fresh */ }
+  }
+  _loadNameCache();
+
+  function _saveNameCache() {
+    const obj = {};
+    for (const [k, v] of _nameCache) obj[k] = v;
+    GM_setValue('nameCache', JSON.stringify(obj));
+  }
 
   function findAccountSection() {
     const accountLink = document.querySelector('header a[href="/account"]');
@@ -37,22 +56,31 @@ const HeaderButton = (() => {
     section.insertBefore(btn, section.firstChild);
   }
 
-  async function fetchItemNames() {
-    try {
-      const res = await fetch('/account/alerts');
-      if (!res.ok) return new Map();
-      const html = await res.text();
-      const doc = new DOMParser().parseFromString(html, 'text/html');
-      const map = new Map();
-      doc.querySelectorAll('a[href^="/market/"]').forEach(a => {
-        const parts = a.getAttribute('href').split('/');
-        const itemId = Number(parts[2]);
-        if (!isNaN(itemId)) map.set(itemId, a.textContent.trim());
+  async function fetchItemNames(itemIds) {
+    const uncached = itemIds.filter(id => !_nameCache.has(id));
+    if (uncached.length) {
+      const results = await Promise.allSettled(
+        uncached.map(id =>
+          fetch(`/market/${id}`).then(res => res.ok ? res.text() : null)
+        )
+      );
+      let added = false;
+      results.forEach((result, i) => {
+        if (result.status !== 'fulfilled' || !result.value) return;
+        const doc = new DOMParser().parseFromString(result.value, 'text/html');
+        const h1 = doc.querySelector('h1');
+        if (h1) {
+          const name = h1.textContent.trim().replace(/^\d+\s+/, '');
+          if (name) { _nameCache.set(uncached[i], name); added = true; }
+        }
       });
-      return map;
-    } catch {
-      return new Map();
+      if (added) _saveNameCache();
     }
+    const map = new Map();
+    for (const id of itemIds) {
+      if (_nameCache.has(id)) map.set(id, _nameCache.get(id));
+    }
+    return map;
   }
 
   function detectPageContext() {
@@ -73,15 +101,10 @@ const HeaderButton = (() => {
     const prevError = document.getElementById('univ-alert-error');
     if (prevError) prevError.remove();
 
-    const results = await Promise.allSettled([
-      _API().getAlerts(),
-      fetchItemNames(),
-    ]);
-
-    const alertsResult = results[0];
-    const namesResult = results[1];
-
-    if (alertsResult.status === 'rejected') {
+    let allAlerts;
+    try {
+      allAlerts = await _API().getAlerts();
+    } catch {
       const errorEl = document.createElement('div');
       errorEl.id = 'univ-alert-error';
       errorEl.style.cssText = 'color:#ff6b6b;font-size:13px;margin-top:4px';
@@ -91,8 +114,8 @@ const HeaderButton = (() => {
       return;
     }
 
-    const allAlerts = alertsResult.value;
-    const nameMap = namesResult.status === 'fulfilled' ? namesResult.value : new Map();
+    const uniqueItemIds = [...new Set(allAlerts.map(a => a.itemId))];
+    const nameMap = await fetchItemNames(uniqueItemIds);
 
     const groups = _Grouping().groupAlerts(allAlerts);
     groups.forEach(g => {
@@ -112,7 +135,7 @@ const HeaderButton = (() => {
     _initObserver.observe(document.body, { childList: true, subtree: true });
   }
 
-  return { init, injectButton, handleClick };
+  return { init, injectButton, handleClick, _resetNameCache: _loadNameCache };
 })();
 
 if (typeof module !== 'undefined') module.exports = HeaderButton;

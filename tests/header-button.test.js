@@ -9,6 +9,7 @@ beforeEach(() => {
   document.body.innerHTML = '';
   jest.clearAllMocks();
   fetch.mockReset();
+  HeaderButton._resetNameCache();
 });
 
 function setupHeader() {
@@ -71,17 +72,101 @@ describe('handleClick', () => {
     document.body.insertAdjacentHTML('beforeend', '<h1>木棉原木</h1>');
 
     API.getAlerts.mockResolvedValue([alert1]);
-    fetch.mockResolvedValue({ ok: true, text: () => Promise.resolve('<a href="/market/44015">木棉原木</a>') });
+    fetch.mockResolvedValue({ ok: true, text: () => Promise.resolve('<html><body><h1>653 木棉原木</h1></body></html>') });
 
     await HeaderButton.handleClick();
 
     expect(API.getAlerts).toHaveBeenCalled();
+    expect(fetch).toHaveBeenCalledWith('/market/44015');
     expect(Modal.openBulkModal).toHaveBeenCalled();
     const callArgs = Modal.openBulkModal.mock.calls[0][0];
     expect(callArgs.currentItemId).toBe(44015);
     expect(callArgs.currentItemName).toBe('木棉原木');
     expect(callArgs.groups).toHaveLength(1);
-    expect(callArgs.nameMap).toBeInstanceOf(Map);
+    expect(callArgs.nameMap.get(44015)).toBe('木棉原木');
+  });
+
+  test('resolves names for multiple distinct items', async () => {
+    setupHeader();
+    delete window.location;
+    window.location = { pathname: '/' };
+
+    const alert2 = {
+      ...alert1, id: 'a2', itemId: 42934, worldId: 4030,
+      trigger: { filters: [], mapper: 'pricePerUnit', reducer: 'min', comparison: { lt: { target: 200 } } },
+    };
+    API.getAlerts.mockResolvedValue([alert1, alert2]);
+    fetch.mockImplementation((url) => {
+      if (url === '/market/44015') {
+        return Promise.resolve({ ok: true, text: () => Promise.resolve('<html><body><h1>653 木棉原木</h1></body></html>') });
+      }
+      if (url === '/market/42934') {
+        return Promise.resolve({ ok: true, text: () => Promise.resolve('<html><body><h1>710 某裝備</h1></body></html>') });
+      }
+      return Promise.resolve({ ok: false });
+    });
+
+    await HeaderButton.handleClick();
+
+    const callArgs = Modal.openBulkModal.mock.calls[0][0];
+    expect(callArgs.nameMap.get(44015)).toBe('木棉原木');
+    expect(callArgs.nameMap.get(42934)).toBe('某裝備');
+  });
+
+  test('persists fetched names to GM storage', async () => {
+    setupHeader();
+    delete window.location;
+    window.location = { pathname: '/' };
+
+    API.getAlerts.mockResolvedValue([alert1]);
+    fetch.mockResolvedValue({ ok: true, text: () => Promise.resolve('<html><body><h1>653 木棉原木</h1></body></html>') });
+
+    await HeaderButton.handleClick();
+
+    expect(GM_setValue).toHaveBeenCalledWith('nameCache', JSON.stringify({ 44015: '木棉原木' }));
+  });
+
+  test('loads names from GM storage and skips fetch', async () => {
+    setupHeader();
+    delete window.location;
+    window.location = { pathname: '/' };
+
+    // Seed GM storage as if a previous page load cached this name
+    GM_getValue.mockReturnValue(JSON.stringify({ 44015: '木棉原木' }));
+    HeaderButton._resetNameCache(); // re-load from GM storage
+
+    API.getAlerts.mockResolvedValue([alert1]);
+
+    await HeaderButton.handleClick();
+
+    expect(fetch).not.toHaveBeenCalled();
+    expect(Modal.openBulkModal.mock.calls[0][0].nameMap.get(44015)).toBe('木棉原木');
+  });
+
+  test('fetches only uncached items when alerts grow', async () => {
+    setupHeader();
+    delete window.location;
+    window.location = { pathname: '/' };
+
+    // Seed GM storage with one known name
+    GM_getValue.mockReturnValue(JSON.stringify({ 44015: '木棉原木' }));
+    HeaderButton._resetNameCache();
+
+    const alert2 = { ...alert1, id: 'a2', itemId: 42934 };
+    API.getAlerts.mockResolvedValue([alert1, alert2]);
+    fetch.mockResolvedValue({ ok: true, text: () => Promise.resolve('<html><body><h1>710 某裝備</h1></body></html>') });
+
+    await HeaderButton.handleClick();
+
+    // Only the new item was fetched
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledWith('/market/42934');
+    // Both names present in map
+    const nameMap = Modal.openBulkModal.mock.calls[0][0].nameMap;
+    expect(nameMap.get(44015)).toBe('木棉原木');
+    expect(nameMap.get(42934)).toBe('某裝備');
+    // GM storage updated with both
+    expect(GM_setValue).toHaveBeenCalledWith('nameCache', JSON.stringify({ 44015: '木棉原木', 42934: '某裝備' }));
   });
 
   test('passes null currentItemId when not on market item page', async () => {
@@ -103,10 +188,10 @@ describe('handleClick', () => {
     setupHeader();
     HeaderButton.injectButton();
     API.getAlerts.mockRejectedValue(new Error('Network error'));
-    fetch.mockResolvedValue({ ok: true, text: () => Promise.resolve('') });
 
     await HeaderButton.handleClick();
 
+    expect(fetch).not.toHaveBeenCalled();
     expect(Modal.openBulkModal).not.toHaveBeenCalled();
     const errorEl = document.getElementById('univ-alert-error');
     expect(errorEl).not.toBeNull();
@@ -137,7 +222,7 @@ describe('handleClick', () => {
     document.body.insertAdjacentHTML('beforeend', '<h1>木棉原木</h1>');
 
     API.getAlerts.mockResolvedValue([alert1]);
-    fetch.mockResolvedValue({ ok: true, text: () => Promise.resolve('') });
+    fetch.mockResolvedValue({ ok: true, text: () => Promise.resolve('<html><body><h1>653 木棉原木</h1></body></html>') });
 
     await HeaderButton.handleClick();
 
