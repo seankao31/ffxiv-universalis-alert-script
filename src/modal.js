@@ -225,6 +225,88 @@ const Modal = (() => {
     });
   }
 
+  function openBulkModal({ itemId, itemName, groups }) {
+    closeModal(); // remove any existing modal
+
+    const overlay = document.createElement('div');
+    overlay.id = 'univ-alert-modal';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:9999';
+
+    const innerContainer = document.createElement('div');
+    innerContainer.style.cssText = 'background:#1a1a2e;border-radius:8px;padding:24px;width:480px;max-height:80vh;overflow-y:auto;color:#fff';
+    overlay.appendChild(innerContainer);
+    document.body.appendChild(overlay);
+
+    // Escape key dismiss
+    const onKeydown = (e) => { if (e.key === 'Escape') closeModal(); };
+    document.addEventListener('keydown', onKeydown);
+    overlay._onKeydown = onKeydown;
+
+    // Overlay click dismiss
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+
+    // --- Navigation functions ---
+
+    function showListView(currentGroups) {
+      innerContainer.innerHTML = '';
+      renderListView(innerContainer, {
+        itemId, itemName, groups: currentGroups,
+        onEdit: (group) => showFormView(group, currentGroups),
+        onDelete: (group, idx, btn) => {
+          handleListDelete(group, idx, btn, innerContainer, () => {
+            // All groups deleted — show blank form with no back button
+            showFormView(null, null);
+          });
+        },
+        onNew: () => showFormView(null, currentGroups),
+        onClose: () => closeModal(),
+      });
+    }
+
+    function showFormView(group, currentGroupsForBack) {
+      innerContainer.innerHTML = '';
+      const onBack = currentGroupsForBack ? () => showListView(currentGroupsForBack) : null;
+
+      const onSave = async (formState, onProgress) => {
+        onProgress?.({ phase: 'refreshing' });
+        const freshAlerts = await _API().getAlerts();
+        const freshItemAlerts = freshAlerts.filter(a => a.itemId === itemId);
+        const freshGroups = _Grouping().groupAlerts(freshItemAlerts);
+        freshGroups.forEach(g => {
+          g.worlds = g.worlds.map(w => ({ ...w, worldName: _WorldMap.worldById(w.worldId)?.worldName || '' }));
+        });
+
+        // Find matching group by trigger key (if editing)
+        const normalizeTrigger = _Grouping().normalizeTrigger;
+        const originalTriggerKey = group ? normalizeTrigger(group.trigger) : null;
+        const freshGroup = originalTriggerKey
+          ? freshGroups.find(g => normalizeTrigger(g.trigger) === originalTriggerKey) || null
+          : null;
+
+        const ops = _SaveOps().computeSaveOps(freshGroup, formState, _WorldMap.WORLDS);
+        await _SaveOps().executeSaveOps(ops, itemId, formState, { onProgress });
+
+        // After save: re-fetch and return to list view
+        const updatedAlerts = await _API().getAlerts();
+        const updatedItemAlerts = updatedAlerts.filter(a => a.itemId === itemId);
+        const updatedGroups = _Grouping().groupAlerts(updatedItemAlerts);
+        updatedGroups.forEach(g => {
+          g.worlds = g.worlds.map(w => ({ ...w, worldName: _WorldMap.worldById(w.worldId)?.worldName || '' }));
+        });
+        showListView(updatedGroups);
+      };
+
+      renderFormView(innerContainer, { itemId, itemName, group, onSave, onBack, multipleGroups: false });
+    }
+
+    // --- Initial routing ---
+    if (groups.length === 0) {
+      showFormView(null, null);
+    } else {
+      showListView(groups);
+    }
+  }
+
   function openModal({ itemId, itemName, group, onSave, multipleGroups = false }) {
     const overlay = document.createElement('div');
     overlay.id = 'univ-alert-modal';
@@ -304,7 +386,7 @@ const Modal = (() => {
     }
   }
 
-  return { openModal, closeModal, formatRule, renderListView, handleListDelete };
+  return { openModal, closeModal, formatRule, renderListView, handleListDelete, openBulkModal };
 })();
 
 if (typeof module !== 'undefined') module.exports = Modal;
