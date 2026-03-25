@@ -89,6 +89,28 @@ describe('computeSaveOps', () => {
     const ops = computeSaveOps(null, formState([]), WORLDS, 40);
     expect(ops.capacityError).toBeNull();
   });
+
+  test('edit with net zero change at full capacity → no capacityError', () => {
+    const group8 = {
+      name: 'My Alert', itemId: 44015, trigger,
+      worlds: WORLDS.map(w => ({ worldId: w.worldId, alertId: `alert-${w.worldId}`, worldName: w.worldName })),
+    };
+    const newTrigger = { ...trigger, comparison: { lt: { target: 999 } } };
+    const ops = computeSaveOps(group8, formState(WORLDS.map(w => w.worldId), newTrigger), WORLDS, 40);
+    expect(ops.netChange).toBe(0); // 8 posts - 8 deletes
+    expect(ops.capacityError).toBeNull();
+  });
+
+  test('edit that adds more worlds than it removes → capacityError when exceeds limit', () => {
+    const ops = computeSaveOps(existingGroup, formState([4028, 4029, 4030, 4031, 4032]), WORLDS, 37);
+    // net = 4 posts (4028, 4029, 4031, 4032) - 0 deletes = +4; 37 + 4 = 41 > 40
+    expect(ops.capacityError).toBe('Not enough alert slots (need 4, only 3 available)');
+  });
+
+  test('edit that adds more worlds than it removes → no error when fits', () => {
+    const ops = computeSaveOps(existingGroup, formState([4028, 4029, 4030, 4031, 4032]), WORLDS, 36);
+    expect(ops.capacityError).toBeNull();
+  });
 });
 
 // --- executeSaveOps ---
