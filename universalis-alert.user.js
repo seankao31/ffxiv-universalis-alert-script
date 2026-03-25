@@ -346,7 +346,7 @@ const Modal = (() => {
     return trigger.filters.includes('hq') ? `${label} <span style="background:#4a8a4a;border-radius:3px;padding:0 4px;font-size:11px">HQ</span>` : label;
   }
 
-  function renderFormView(container, { itemId, itemName, group, onSave, onBack, multipleGroups }) {
+  function renderFormView(container, { itemId, itemName, group, onSave, onBack }) {
     const existingWorldIds = new Set((group?.worlds || []).map(w => w.worldId));
     const existingTrigger = group?.trigger || { filters: [], mapper: 'pricePerUnit', reducer: 'min', comparison: { lt: { target: 0 } } };
     const existingComparator = Object.keys(existingTrigger.comparison)[0]; // 'lt' or 'gt'
@@ -368,11 +368,6 @@ const Modal = (() => {
       </label>`;
     }).join('');
 
-    const multiNotice = multipleGroups
-      ? `<div data-notice="multiple-groups" style="background:#3a2a00;border:1px solid #ff9800;padding:8px;border-radius:4px;margin-bottom:12px;font-size:12px">
-           Multiple alert rules exist for this item. Editing here will only affect this rule. Use the <a href="/account/alerts" style="color:#ff9800">Alerts page</a> to manage all rules.
-         </div>` : '';
-
     const backLink = onBack
       ? `<a href="#" data-action="back" style="color:#aaa;font-size:13px;text-decoration:none;display:inline-block;margin-bottom:12px">\u2190 Back to alerts</a>`
       : '';
@@ -380,7 +375,6 @@ const Modal = (() => {
     container.innerHTML = `
         ${backLink}
         <h3 style="margin:0 0 16px">Set Alerts \u2014 ${itemName}</h3>
-        ${multiNotice}
         <form id="univ-alert-form">
           <div style="margin-bottom:12px">
             <label style="display:block;margin-bottom:4px;font-size:13px">Alert Name</label>
@@ -491,8 +485,10 @@ const Modal = (() => {
     });
   }
 
-  function renderListView(container, { itemId, itemName, groups, onEdit, onDelete, onNew, onClose }) {
-    const rows = groups.map((g, idx) => {
+  function renderListView(container, { groups, nameMap, onEdit, onDelete, onNew, onClose, newAlertDisabled }) {
+    const sorted = [...groups].sort((a, b) => a.itemId - b.itemId);
+    const rows = sorted.map((g, idx) => {
+      const itemName = nameMap.get(g.itemId) || `Item #${g.itemId}`;
       const worldPills = g.worlds.map(w =>
         `<span data-world-pill style="background:#1a3a5c;border-radius:12px;padding:2px 8px;font-size:12px;margin:2px;display:inline-block">${w.worldName || w.worldId}</span>`
       ).join('');
@@ -500,7 +496,8 @@ const Modal = (() => {
         <div data-group-row="${idx}" style="background:#2a2a4a;padding:10px;border-radius:4px;margin-bottom:8px">
           <div style="display:flex;justify-content:space-between;align-items:flex-start">
             <div>
-              <div style="font-size:13px;color:#ccc">${formatRule(g.trigger)}</div>
+              <div style="font-size:14px;color:#fff">${itemName} <span style="font-size:11px;color:#888">#${g.itemId}</span></div>
+              <div style="font-size:13px;color:#ccc;margin-top:4px">${formatRule(g.trigger)}</div>
               <div data-world-pills style="margin-top:6px">${worldPills}</div>
             </div>
             <div style="display:flex;gap:6px;flex-shrink:0">
@@ -511,14 +508,18 @@ const Modal = (() => {
         </div>`;
     }).join('');
 
+    const newAlertAttrs = newAlertDisabled
+      ? 'disabled title="Navigate to an item page to create alerts" style="background:#333;border:none;color:#666;padding:8px 20px;border-radius:4px;cursor:not-allowed;display:inline-flex;align-items:center;justify-content:center"'
+      : 'style="background:#1a5a2a;border:none;color:#fff;padding:8px 20px;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center"';
+
     container.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-        <h3 style="margin:0;color:#fff">Bulk Alerts \u2014 ${itemName}</h3>
+        <h3 style="margin:0;color:#fff">Bulk Alerts</h3>
         <span data-action="close" style="cursor:pointer;color:#888;font-size:18px">\u2715</span>
       </div>
       <div data-list-area style="max-height:300px;overflow-y:auto">${rows}</div>
       <div style="border-top:1px solid #333;margin-top:12px;padding-top:12px;text-align:center">
-        <button data-action="new-alert" style="background:#1a5a2a;border:none;color:#fff;padding:8px 20px;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center">New Alert</button>
+        <button data-action="new-alert" ${newAlertAttrs}>New Alert</button>
       </div>`;
 
     // Event delegation — remove stale listener from previous render to avoid duplicates.
@@ -530,9 +531,9 @@ const Modal = (() => {
     const handler = (e) => {
       const action = e.target.dataset.action;
       if (action === 'close') { onClose(); return; }
-      if (action === 'new-alert') { onNew(); return; }
+      if (action === 'new-alert') { if (!newAlertDisabled) onNew(); return; }
       const idx = Number(e.target.dataset.groupIdx);
-      const group = groups[idx];
+      const group = sorted[idx];
       if (!group) return;
       if (action === 'edit') onEdit(group);
       if (action === 'delete') onDelete(group, idx, e.target);
@@ -541,8 +542,8 @@ const Modal = (() => {
     container.addEventListener('click', handler);
   }
 
-  function openBulkModal({ itemId, itemName, groups }) {
-    closeModal(); // remove any existing modal
+  function openBulkModal({ groups, nameMap, currentItemId, currentItemName }) {
+    closeModal();
 
     const overlay = document.createElement('div');
     overlay.id = 'univ-alert-modal';
@@ -553,25 +554,34 @@ const Modal = (() => {
     overlay.appendChild(innerContainer);
     document.body.appendChild(overlay);
 
-    // Escape key dismiss
     const onKeydown = (e) => { if (e.key === 'Escape') closeModal(); };
     document.addEventListener('keydown', onKeydown);
     overlay._onKeydown = onKeydown;
-
-    // Overlay click dismiss
     overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
 
-    // --- Navigation functions ---
+    function showEmptyState() {
+      innerContainer.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <h3 style="margin:0;color:#fff">Bulk Alerts</h3>
+          <span data-action="close-empty" style="cursor:pointer;color:#888;font-size:18px">\u2715</span>
+        </div>
+        <p style="color:#888;text-align:center;padding:24px 0">No alerts yet. Navigate to an item page to create one.</p>`;
+      innerContainer.querySelector('[data-action="close-empty"]').addEventListener('click', () => closeModal());
+    }
 
     function showListView(currentGroups) {
       innerContainer.innerHTML = '';
       renderListView(innerContainer, {
-        itemId, itemName, groups: currentGroups,
+        groups: currentGroups, nameMap,
+        newAlertDisabled: !currentItemId,
         onEdit: (group) => showFormView(group, currentGroups),
         onDelete: (group, idx, btn) => {
           handleListDelete(group, idx, btn, innerContainer, () => {
-            // All groups deleted — show blank form with no back button
-            showFormView(null, null);
+            if (currentItemId) {
+              showFormView(null, null);
+            } else {
+              showEmptyState();
+            }
           });
         },
         onNew: () => showFormView(null, currentGroups),
@@ -582,76 +592,47 @@ const Modal = (() => {
     function showFormView(group, currentGroupsForBack) {
       innerContainer.innerHTML = '';
       const onBack = currentGroupsForBack ? () => showListView(currentGroupsForBack) : null;
+      const itemId = group ? group.itemId : currentItemId;
+      const itemName = group ? (nameMap.get(group.itemId) || `Item #${group.itemId}`) : currentItemName;
 
       const onSave = async (formState, onProgress) => {
         onProgress?.({ phase: 'refreshing' });
         const freshAlerts = await _API().getAlerts();
-        const freshItemAlerts = freshAlerts.filter(a => a.itemId === itemId);
-        const freshGroups = _Grouping().groupAlerts(freshItemAlerts);
+        const freshGroups = _Grouping().groupAlerts(freshAlerts);
         freshGroups.forEach(g => {
           g.worlds = g.worlds.map(w => ({ ...w, worldName: _WorldMap.worldById(w.worldId)?.worldName || '' }));
         });
 
-        // Find matching group by trigger key (if editing)
         const normalizeTrigger = _Grouping().normalizeTrigger;
         const originalTriggerKey = group ? normalizeTrigger(group.trigger) : null;
         const freshGroup = originalTriggerKey
-          ? freshGroups.find(g => normalizeTrigger(g.trigger) === originalTriggerKey) || null
+          ? freshGroups.find(g => g.itemId === itemId && normalizeTrigger(g.trigger) === originalTriggerKey) || null
           : null;
 
         const ops = _SaveOps().computeSaveOps(freshGroup, formState, _WorldMap.WORLDS);
         await _SaveOps().executeSaveOps(ops, itemId, formState, { onProgress });
 
-        // After save: re-fetch and return to list view
         const updatedAlerts = await _API().getAlerts();
-        const updatedItemAlerts = updatedAlerts.filter(a => a.itemId === itemId);
-        const updatedGroups = _Grouping().groupAlerts(updatedItemAlerts);
+        const updatedGroups = _Grouping().groupAlerts(updatedAlerts);
         updatedGroups.forEach(g => {
           g.worlds = g.worlds.map(w => ({ ...w, worldName: _WorldMap.worldById(w.worldId)?.worldName || '' }));
         });
         showListView(updatedGroups);
       };
 
-      renderFormView(innerContainer, { itemId, itemName, group, onSave, onBack, multipleGroups: false });
+      renderFormView(innerContainer, { itemId, itemName, group, onSave, onBack });
     }
 
-    // --- Initial routing ---
+    // Initial routing
     if (groups.length === 0) {
-      showFormView(null, null);
+      if (currentItemId) {
+        showFormView(null, null);
+      } else {
+        showEmptyState();
+      }
     } else {
       showListView(groups);
     }
-  }
-
-  function openModal({ itemId, itemName, group, onSave, multipleGroups = false }) {
-    const overlay = document.createElement('div');
-    overlay.id = 'univ-alert-modal';
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:9999';
-
-    const innerContainer = document.createElement('div');
-    innerContainer.style.cssText = 'background:#1a1a2e;border-radius:8px;padding:24px;width:480px;max-height:80vh;overflow-y:auto;color:#fff';
-    overlay.appendChild(innerContainer);
-
-    document.body.appendChild(overlay);
-
-    // Dismiss on Escape
-    const onKeydown = (e) => {
-      if (e.key === 'Escape') closeModal();
-    };
-    document.addEventListener('keydown', onKeydown);
-    overlay._onKeydown = onKeydown; // store for cleanup
-
-    // Dismiss on overlay background click
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) closeModal();
-    });
-
-    const wrappedOnSave = async (formState, onProgress) => {
-      await onSave(formState, onProgress);
-      closeModal();
-    };
-
-    renderFormView(innerContainer, { itemId, itemName, group, onSave: wrappedOnSave, onBack: null, multipleGroups });
   }
 
   function closeModal() {
@@ -706,14 +687,14 @@ const Modal = (() => {
     }
   }
 
-  return { openModal, closeModal, formatRule, renderListView, handleListDelete, openBulkModal };
+  return { closeModal, formatRule, renderListView, handleListDelete, openBulkModal };
 })();
 
 if (typeof module !== 'undefined') module.exports = Modal;
 
 
-// ===== src/market-page.js =====
-const MarketPage = (() => {
+// ===== src/header-button.js =====
+const HeaderButton = (() => {
   const _apiModule = typeof module !== 'undefined' ? require('./api') : null;
   const _modalModule = typeof module !== 'undefined' ? require('./modal') : null;
   const _groupingModule = typeof module !== 'undefined' ? require('./grouping') : null;
@@ -724,95 +705,122 @@ const MarketPage = (() => {
   function _Grouping() { return typeof Grouping !== 'undefined' ? Grouping : _groupingModule; }
   function _WorldMap() { return typeof WorldMap !== 'undefined' ? WorldMap : _worldMapModule; }
 
-  function findButtonBar() {
-    return document.querySelector('.box_flex.form');
+  function findAccountSection() {
+    const accountLink = document.querySelector('header a[href="/account"]');
+    if (!accountLink) return null;
+    const headerWrapper = document.querySelector('header > div');
+    if (!headerWrapper) return null;
+    // Walk up from the account link to find the direct child of the header wrapper
+    let el = accountLink;
+    while (el.parentElement && el.parentElement !== headerWrapper) {
+      el = el.parentElement;
+    }
+    return el.parentElement === headerWrapper ? el : null;
   }
 
-  function readItemName() {
-    const heading = document.querySelector('h1');
-    return heading ? heading.textContent.trim() : '';
-  }
-
-  function injectMarketButton(itemId) {
-    if (document.getElementById('univ-alert-btn')) return; // idempotent
+  function injectButton() {
+    if (document.getElementById('univ-alert-btn')) return;
+    const section = findAccountSection();
+    if (!section) return;
 
     const btn = document.createElement('button');
     btn.id = 'univ-alert-btn';
-    btn.textContent = '🔔 Bulk Alerts';
-    btn.style.cssText = 'background:#1a5a8a;border:none;color:#fff;padding:8px 16px;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;margin-left:8px';
+    btn.textContent = '\uD83D\uDD14 Bulk Alerts';
+    btn.style.cssText = 'background:#1a5a8a;border:none;color:#fff;padding:8px 16px;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;margin-right:8px';
+    btn.addEventListener('click', () => handleClick());
+    section.insertBefore(btn, section.firstChild);
+  }
 
-    btn.addEventListener('click', () => handleAlertButtonClick(itemId, readItemName()));
-
-    const bar = findButtonBar();
-    if (bar) {
-      bar.appendChild(btn);
-    } else {
-      document.body.appendChild(btn);
+  async function fetchItemNames() {
+    try {
+      const res = await fetch('/account/alerts');
+      if (!res.ok) return new Map();
+      const html = await res.text();
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      const map = new Map();
+      doc.querySelectorAll('a[href^="/market/"]').forEach(a => {
+        const parts = a.getAttribute('href').split('/');
+        const itemId = Number(parts[2]);
+        if (!isNaN(itemId)) map.set(itemId, a.textContent.trim());
+      });
+      return map;
+    } catch {
+      return new Map();
     }
   }
 
-  async function handleAlertButtonClick(itemId, itemName) {
-    let allAlerts;
-    try {
-      allAlerts = await _API().getAlerts();
-    } catch (err) {
-      // Show inline error — modal not opened
-      const errorEl = document.getElementById('univ-alert-error') || document.createElement('div');
+  function detectPageContext() {
+    const parts = window.location.pathname.split('/');
+    if (parts.length === 3 && parts[1] === 'market') {
+      const itemId = Number(parts[2]);
+      if (itemId > 0) {
+        const h1 = document.querySelector('h1');
+        const itemName = h1 ? h1.textContent.trim() : '';
+        return { currentItemId: itemId, currentItemName: itemName };
+      }
+    }
+    return { currentItemId: null, currentItemName: null };
+  }
+
+  async function handleClick() {
+    // Clear previous error
+    const prevError = document.getElementById('univ-alert-error');
+    if (prevError) prevError.remove();
+
+    const results = await Promise.allSettled([
+      _API().getAlerts(),
+      fetchItemNames(),
+    ]);
+
+    const alertsResult = results[0];
+    const namesResult = results[1];
+
+    if (alertsResult.status === 'rejected') {
+      const errorEl = document.createElement('div');
       errorEl.id = 'univ-alert-error';
       errorEl.style.cssText = 'color:#ff6b6b;font-size:13px;margin-top:4px';
-      errorEl.textContent = 'Failed to load existing alerts — check your connection';
+      errorEl.textContent = 'Failed to load alerts \u2014 check your connection';
       const btn = document.getElementById('univ-alert-btn');
       if (btn) btn.insertAdjacentElement('afterend', errorEl);
       return;
     }
 
-    const itemAlerts = allAlerts.filter(a => a.itemId === itemId);
-    const groups = _Grouping().groupAlerts(itemAlerts);
+    const allAlerts = alertsResult.value;
+    const nameMap = namesResult.status === 'fulfilled' ? namesResult.value : new Map();
+
+    const groups = _Grouping().groupAlerts(allAlerts);
     groups.forEach(g => {
       g.worlds = g.worlds.map(w => ({ ...w, worldName: _WorldMap().worldById(w.worldId)?.worldName || '' }));
     });
 
-    _Modal().openBulkModal({ itemId, itemName, groups });
+    const { currentItemId, currentItemName } = detectPageContext();
+    _Modal().openBulkModal({ groups, nameMap, currentItemId, currentItemName });
   }
 
   function init() {
-    function attempt() {
-      if (!findButtonBar()) return false;
-      const pathParts = window.location.pathname.split('/');
-      if (pathParts.length !== 3) return true; // not a /market/{id} page, but done waiting
-      const itemId = Number(pathParts[2]);
-      if (itemId > 0) injectMarketButton(itemId);
-      return true;
+    if (findAccountSection()) {
+      injectButton();
+      return;
     }
-
-    if (attempt()) return; // h1 already present (SSR/CSR already rendered)
-
-    // h1 not yet in DOM — observe for it (SPA navigation case)
     const observer = new MutationObserver(() => {
-      if (attempt()) observer.disconnect();
+      if (findAccountSection()) {
+        observer.disconnect();
+        injectButton();
+      }
     });
     observer.observe(document.body, { childList: true, subtree: true });
   }
 
-  return { init, injectMarketButton, handleAlertButtonClick };
+  return { init, injectButton, handleClick };
 })();
 
-if (typeof module !== 'undefined') module.exports = MarketPage;
+if (typeof module !== 'undefined') module.exports = HeaderButton;
 
 
 // ===== src/init.js =====
 const Init = (() => {
-  function route(pathname) {
-    if (pathname.startsWith('/market/')) {
-      if (pathname.split('/').length === 3) { // /market/{id} only, not sub-paths
-        MarketPage.init();
-      }
-    } else if (pathname.startsWith('/account/') && pathname.split('/').length === 3) {
-      AlertsPage.injectTab();
-      if (pathname === '/account/bulk-alerts') {
-        AlertsPage.init();
-      }
-    }
+  function route() {
+    HeaderButton.init();
   }
 
   function setupNavigationObserver() {
@@ -822,7 +830,7 @@ const Init = (() => {
       const currentPath = window.location.pathname;
       if (currentPath === lastPath) return;
       lastPath = currentPath;
-      route(currentPath);
+      route();
     });
 
     observer.observe(document.body, { childList: true, subtree: true });
@@ -830,7 +838,7 @@ const Init = (() => {
 
   function main() {
     setupNavigationObserver();
-    route(window.location.pathname);
+    route();
   }
 
   main();
