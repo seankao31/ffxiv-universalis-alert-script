@@ -198,19 +198,20 @@ const AlertsPage = (() => {
         if (el.tagName !== 'SCRIPT' && el.id !== 'univ-alert-panel') el.style.display = 'none';
       });
 
+      // Create a container early so both success and error paths can render into it
+      const container = document.createElement('div');
+      document.body.prepend(container);
+
       let alerts;
       try {
         alerts = await _API().getAlerts();
       } catch {
-        await handleInitError();
+        await handleInitError(container);
         // Restore native content
         document.querySelectorAll('body > *:not(#univ-alert-panel)').forEach(el => { el.style.display = ''; });
         return;
       }
 
-      // Create a container for the alerts panel and prepend to body
-      const container = document.createElement('div');
-      document.body.prepend(container);
       renderAlertsPanel(alerts, nameMap, container);
     }
 
@@ -238,12 +239,13 @@ const AlertsPage = (() => {
   }
 
   // Exported so it can be tested directly without triggering MutationObserver
-  async function handleInitError() {
+  async function handleInitError(container) {
     const errorEl = document.createElement('div');
     errorEl.dataset.initError = '';
     errorEl.style.cssText = 'color:#ff6b6b;padding:24px;font-size:16px;width:100%';
     errorEl.textContent = 'Failed to load existing alerts — check your connection';
-    document.body.prepend(errorEl);
+    container.innerHTML = '';
+    container.appendChild(errorEl);
   }
 
   return { init, scrapeItemNames, fetchItemNames, renderAlertsPanel, deleteGroup, handleInitError };

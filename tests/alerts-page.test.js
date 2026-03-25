@@ -74,17 +74,13 @@ describe('renderAlertsPanel', () => {
   });
 });
 
-describe('init — GET failure', () => {
-  test('shows full-width error and no panel when getAlerts rejects', async () => {
-    API.getAlerts.mockRejectedValue(new Error('Server error'));
-    // Seed native DOM with a market anchor so the observer fires immediately
-    document.body.innerHTML = '<a href="/market/44015">木棉原木</a>';
-
-    // Invoke the init-level error path directly via the exported helper
-    await AlertsPage.handleInitError();
+describe('handleInitError', () => {
+  test('renders error message into container', async () => {
+    const container = createContainer();
+    await AlertsPage.handleInitError(container);
 
     expect(document.getElementById('univ-alert-panel')).toBeNull();
-    const errorEl = document.querySelector('[data-init-error]');
+    const errorEl = container.querySelector('[data-init-error]');
     expect(errorEl).not.toBeNull();
     expect(errorEl.textContent).toContain('Failed to load existing alerts');
   });
