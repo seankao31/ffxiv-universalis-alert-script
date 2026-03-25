@@ -174,6 +174,49 @@ const Modal = (() => {
     });
   }
 
+  function renderListView(container, { itemId, itemName, groups, onEdit, onDelete, onNew, onClose }) {
+    const rows = groups.map((g, idx) => {
+      const worldPills = g.worlds.map(w =>
+        `<span data-world-pill style="background:#1a3a5c;border-radius:12px;padding:2px 8px;font-size:12px;margin:2px;display:inline-block">${w.worldName || w.worldId}</span>`
+      ).join('');
+      return `
+        <div data-group-row="${idx}" style="background:#2a2a4a;padding:10px;border-radius:4px;margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start">
+            <div>
+              <div style="font-size:13px;color:#ccc">${formatRule(g.trigger)}</div>
+              <div data-world-pills style="margin-top:6px">${worldPills}</div>
+            </div>
+            <div style="display:flex;gap:6px;flex-shrink:0">
+              <button data-action="edit" data-group-idx="${idx}" style="background:#1a4a7a;border:none;color:#fff;padding:4px 10px;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center">Edit</button>
+              <button data-action="delete" data-group-idx="${idx}" style="background:#6a1a1a;border:none;color:#fff;padding:4px 10px;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center">Delete</button>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+
+    container.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <h3 style="margin:0;color:#fff">Bulk Alerts \u2014 ${itemName}</h3>
+        <span data-action="close" style="cursor:pointer;color:#888;font-size:18px">\u2715</span>
+      </div>
+      <div data-list-area style="max-height:300px;overflow-y:auto">${rows}</div>
+      <div style="border-top:1px solid #333;margin-top:12px;padding-top:12px;text-align:center">
+        <button data-action="new-alert" style="background:#1a5a2a;border:none;color:#fff;padding:8px 20px;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center">New Alert</button>
+      </div>`;
+
+    // Event delegation
+    container.addEventListener('click', (e) => {
+      const action = e.target.dataset.action;
+      if (action === 'close') { onClose(); return; }
+      if (action === 'new-alert') { onNew(); return; }
+      const idx = Number(e.target.dataset.groupIdx);
+      const group = groups[idx];
+      if (!group) return;
+      if (action === 'edit') onEdit(group);
+      if (action === 'delete') onDelete(group, idx, e.target);
+    });
+  }
+
   function openModal({ itemId, itemName, group, onSave, multipleGroups = false }) {
     const overlay = document.createElement('div');
     overlay.id = 'univ-alert-modal';
@@ -215,7 +258,7 @@ const Modal = (() => {
     }
   }
 
-  return { openModal, closeModal, formatRule };
+  return { openModal, closeModal, formatRule, renderListView };
 })();
 
 if (typeof module !== 'undefined') module.exports = Modal;

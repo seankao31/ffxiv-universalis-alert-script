@@ -218,6 +218,70 @@ describe('formatRule', () => {
   });
 });
 
+describe('renderListView', () => {
+  const trigger = { filters: [], mapper: 'pricePerUnit', reducer: 'min', comparison: { lt: { target: 130 } } };
+  const groups = [{
+    itemId: 44015, name: 'Alert', discordWebhook: 'https://wh.com', trigger,
+    worlds: [
+      { worldId: 4030, alertId: 'a1', worldName: '利維坦' },
+      { worldId: 4031, alertId: 'a2', worldName: '鳳凰' },
+    ],
+  }];
+
+  test('renders one row per alert group', () => {
+    const container = document.createElement('div');
+    Modal.renderListView(container, { itemId: 44015, itemName: '木棉原木', groups, onEdit: jest.fn(), onDelete: jest.fn(), onNew: jest.fn(), onClose: jest.fn() });
+    const rows = container.querySelectorAll('[data-group-row]');
+    expect(rows).toHaveLength(1);
+  });
+
+  test('renders world pills for each group', () => {
+    const container = document.createElement('div');
+    Modal.renderListView(container, { itemId: 44015, itemName: '木棉原木', groups, onEdit: jest.fn(), onDelete: jest.fn(), onNew: jest.fn(), onClose: jest.fn() });
+    const pills = container.querySelectorAll('[data-group-row="0"] [data-world-pill]');
+    expect(pills).toHaveLength(2);
+    expect(pills[0].textContent).toBe('利維坦');
+    expect(pills[1].textContent).toBe('鳳凰');
+  });
+
+  test('renders Edit and Delete buttons per group', () => {
+    const container = document.createElement('div');
+    Modal.renderListView(container, { itemId: 44015, itemName: '木棉原木', groups, onEdit: jest.fn(), onDelete: jest.fn(), onNew: jest.fn(), onClose: jest.fn() });
+    expect(container.querySelector('[data-action="edit"]')).not.toBeNull();
+    expect(container.querySelector('[data-action="delete"]')).not.toBeNull();
+  });
+
+  test('renders "New Alert" button', () => {
+    const container = document.createElement('div');
+    Modal.renderListView(container, { itemId: 44015, itemName: '木棉原木', groups, onEdit: jest.fn(), onDelete: jest.fn(), onNew: jest.fn(), onClose: jest.fn() });
+    expect(container.querySelector('[data-action="new-alert"]')).not.toBeNull();
+  });
+
+  test('"New Alert" button calls onNew callback', () => {
+    const container = document.createElement('div');
+    const onNew = jest.fn();
+    Modal.renderListView(container, { itemId: 44015, itemName: '木棉原木', groups, onEdit: jest.fn(), onDelete: jest.fn(), onNew, onClose: jest.fn() });
+    container.querySelector('[data-action="new-alert"]').click();
+    expect(onNew).toHaveBeenCalled();
+  });
+
+  test('Edit button calls onEdit with the group', () => {
+    const container = document.createElement('div');
+    const onEdit = jest.fn();
+    Modal.renderListView(container, { itemId: 44015, itemName: '木棉原木', groups, onEdit, onDelete: jest.fn(), onNew: jest.fn(), onClose: jest.fn() });
+    container.querySelector('[data-action="edit"]').click();
+    expect(onEdit).toHaveBeenCalledWith(groups[0]);
+  });
+
+  test('renders formatted rule text', () => {
+    const container = document.createElement('div');
+    Modal.renderListView(container, { itemId: 44015, itemName: '木棉原木', groups, onEdit: jest.fn(), onDelete: jest.fn(), onNew: jest.fn(), onClose: jest.fn() });
+    expect(container.textContent).toContain('Min');
+    expect(container.textContent).toContain('<');
+    expect(container.textContent).toContain('130');
+  });
+});
+
 describe('closeModal', () => {
   test('removes modal from DOM', () => {
     Modal.openModal({ itemId: 44015, itemName: 'Item', group: null, onSave: jest.fn() });
