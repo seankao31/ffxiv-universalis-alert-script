@@ -9,7 +9,7 @@ const SRC_ORDER = [
   'src/api.js',
   'src/save-ops.js',
   'src/modal.js',
-  'src/market-page.js',
+  'src/header-button.js',
   'src/init.js',
 ];
 
