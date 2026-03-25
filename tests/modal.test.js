@@ -168,6 +168,31 @@ describe('openModal — save progress', () => {
   });
 });
 
+describe('modal dismiss — Escape and overlay click', () => {
+  test('closes modal on Escape key press', () => {
+    Modal.openModal({ itemId: 44015, itemName: 'Item', group: null, onSave: jest.fn() });
+    expect(document.querySelector('#univ-alert-modal')).not.toBeNull();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(document.querySelector('#univ-alert-modal')).toBeNull();
+  });
+
+  test('closes modal when clicking overlay background', () => {
+    Modal.openModal({ itemId: 44015, itemName: 'Item', group: null, onSave: jest.fn() });
+    const overlay = document.querySelector('#univ-alert-modal');
+    expect(overlay).not.toBeNull();
+    // Click the overlay itself (not the inner container)
+    overlay.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(document.querySelector('#univ-alert-modal')).toBeNull();
+  });
+
+  test('does NOT close modal when clicking inside the form container', () => {
+    Modal.openModal({ itemId: 44015, itemName: 'Item', group: null, onSave: jest.fn() });
+    const innerContainer = document.querySelector('#univ-alert-modal > div');
+    innerContainer.dispatchEvent(new MouseEvent('click', { bubbles: false }));
+    expect(document.querySelector('#univ-alert-modal')).not.toBeNull();
+  });
+});
+
 describe('closeModal', () => {
   test('removes modal from DOM', () => {
     Modal.openModal({ itemId: 44015, itemName: 'Item', group: null, onSave: jest.fn() });

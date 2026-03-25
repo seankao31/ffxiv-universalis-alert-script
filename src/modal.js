@@ -176,6 +176,18 @@ const Modal = (() => {
 
     document.body.appendChild(overlay);
 
+    // Dismiss on Escape
+    const onKeydown = (e) => {
+      if (e.key === 'Escape') closeModal();
+    };
+    document.addEventListener('keydown', onKeydown);
+    overlay._onKeydown = onKeydown; // store for cleanup
+
+    // Dismiss on overlay background click
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) closeModal();
+    });
+
     const wrappedOnSave = async (formState, onProgress) => {
       await onSave(formState, onProgress);
       closeModal();
@@ -186,7 +198,12 @@ const Modal = (() => {
 
   function closeModal() {
     const existing = document.getElementById('univ-alert-modal');
-    if (existing) existing.remove();
+    if (existing) {
+      if (existing._onKeydown) {
+        document.removeEventListener('keydown', existing._onKeydown);
+      }
+      existing.remove();
+    }
   }
 
   return { openModal, closeModal };
