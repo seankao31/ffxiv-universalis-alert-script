@@ -201,7 +201,7 @@ describe('formatRule', () => {
     const trigger = { filters: [], mapper: 'pricePerUnit', reducer: 'min', comparison: { lt: { target: 130 } } };
     const result = Modal.formatRule(trigger);
     expect(result).toContain('Min');
-    expect(result).toContain('price');
+    expect(result).toContain('Price');
     expect(result).toContain('<');
     expect(result).toContain('130');
   });

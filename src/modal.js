@@ -35,7 +35,7 @@ const Modal = (() => {
   function formatRule(trigger) {
     const comparator = 'lt' in trigger.comparison ? '<' : '>';
     const target = trigger.comparison[Object.keys(trigger.comparison)[0]].target;
-    const metricLabels = { pricePerUnit: 'Min price', quantity: 'Quantity', total: 'Total' };
+    const metricLabels = { pricePerUnit: 'Price', quantity: 'Quantity', total: 'Total' };
     const reducerLabels = { min: 'Min', max: 'Max', mean: 'Avg' };
     const label = `${reducerLabels[trigger.reducer] || trigger.reducer} ${metricLabels[trigger.mapper] || trigger.mapper} ${comparator} ${target}`;
     return trigger.filters.includes('hq') ? `${label} <span style="background:#4a8a4a;border-radius:3px;padding:0 4px;font-size:11px">HQ</span>` : label;
