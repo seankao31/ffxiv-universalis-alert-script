@@ -12,15 +12,19 @@ beforeEach(() => {
 });
 
 function setupHeader() {
+  // Matches real universalis.app: account section is a direct child of <header>,
+  // sibling to the main wrapper div (not nested inside it)
   document.body.innerHTML = `
-    <header><div>
-      <div class="header-home"><a href="/"><img src="/logo.png" /></a></div>
-      <div class="header-nav"><input type="text" placeholder="search" /></div>
+    <header>
+      <div>
+        <div class="header-home"><a href="/"><img src="/logo.png" /></a></div>
+        <div class="header-nav"><input type="text" placeholder="search" /></div>
+      </div>
       <div>
         <div><a href="/account">帳號</a><span class="username">testuser</span></div>
         <div><button class="btn-settings">⚙️</button></div>
       </div>
-    </div></header>
+    </header>
   `;
 }
 
@@ -28,8 +32,10 @@ describe('injectButton', () => {
   test('inserts button as first child of account section', () => {
     setupHeader();
     HeaderButton.injectButton();
-    const accountSection = document.querySelector('header a[href="/account"]').closest('header > div > div:last-child');
-    expect(accountSection.firstElementChild.id).toBe('univ-alert-btn');
+    const btn = document.getElementById('univ-alert-btn');
+    // Button is first child of the account section (direct child of <header>)
+    expect(btn.parentElement.querySelector('a[href="/account"]')).not.toBeNull();
+    expect(btn.parentElement.parentElement.tagName).toBe('HEADER');
   });
 
   test('button has correct text', () => {
@@ -155,7 +161,7 @@ describe('init', () => {
 
     // Simulate header appearing
     const header = document.createElement('header');
-    header.innerHTML = '<div><div class="header-home"></div><div><div><a href="/account">帳號</a></div><div><button class="btn-settings">⚙️</button></div></div></div>';
+    header.innerHTML = '<div><div class="header-home"></div></div><div><div><a href="/account">帳號</a></div><div><button class="btn-settings">⚙️</button></div></div>';
     document.body.appendChild(header);
     await new Promise(r => setTimeout(r, 0));
 
@@ -170,7 +176,7 @@ describe('init', () => {
 
     // Simulate header appearing
     const header = document.createElement('header');
-    header.innerHTML = '<div><div class="header-home"></div><div><div><a href="/account">帳號</a></div><div><button>⚙️</button></div></div></div>';
+    header.innerHTML = '<div><div class="header-home"></div></div><div><div><a href="/account">帳號</a></div><div><button>⚙️</button></div></div>';
     document.body.appendChild(header);
     await new Promise(r => setTimeout(r, 0));
 

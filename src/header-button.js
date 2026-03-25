@@ -14,14 +14,14 @@ const HeaderButton = (() => {
   function findAccountSection() {
     const accountLink = document.querySelector('header a[href="/account"]');
     if (!accountLink) return null;
-    const headerWrapper = document.querySelector('header > div');
-    if (!headerWrapper) return null;
-    // Walk up from the account link to find the direct child of the header wrapper
+    const header = document.querySelector('header');
+    if (!header) return null;
+    // Walk up from the account link to find the direct child of <header>
     let el = accountLink;
-    while (el.parentElement && el.parentElement !== headerWrapper) {
+    while (el.parentElement && el.parentElement !== header) {
       el = el.parentElement;
     }
-    return el.parentElement === headerWrapper ? el : null;
+    return el.parentElement === header ? el : null;
   }
 
   function injectButton() {
