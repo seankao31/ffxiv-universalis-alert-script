@@ -20,7 +20,7 @@ const Modal = (() => {
     };
   }
 
-  function openModal({ itemId, itemName, group, onSave, multipleGroups = false }) {
+  function renderFormView(container, { itemId, itemName, group, onSave, onBack, multipleGroups }) {
     const existingWorldIds = new Set((group?.worlds || []).map(w => w.worldId));
     const existingTrigger = group?.trigger || { filters: [], mapper: 'pricePerUnit', reducer: 'min', comparison: { lt: { target: 0 } } };
     const existingComparator = Object.keys(existingTrigger.comparison)[0]; // 'lt' or 'gt'
@@ -31,10 +31,6 @@ const Modal = (() => {
     const webhookFromAlert = group?.discordWebhook || '';
     const webhookFromGM = GM_getValue('discordWebhook') || '';
     const initialWebhook = webhookFromAlert || webhookFromGM;
-
-    const overlay = document.createElement('div');
-    overlay.id = 'univ-alert-modal';
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:9999';
 
     const isNewAlert = !group;
     const worldCheckboxes = _WorldMap.WORLDS.map(w => {
@@ -51,9 +47,13 @@ const Modal = (() => {
            Multiple alert rules exist for this item. Editing here will only affect this rule. Use the <a href="/account/alerts" style="color:#ff9800">Alerts page</a> to manage all rules.
          </div>` : '';
 
-    overlay.innerHTML = `
-      <div style="background:#1a1a2e;border-radius:8px;padding:24px;width:480px;max-height:80vh;overflow-y:auto;color:#fff">
-        <h3 style="margin:0 0 16px">Set Alerts — ${itemName}</h3>
+    const backLink = onBack
+      ? `<a href="#" data-action="back" style="color:#aaa;font-size:13px;text-decoration:none;display:inline-block;margin-bottom:12px">\u2190 Back to alerts</a>`
+      : '';
+
+    container.innerHTML = `
+        ${backLink}
+        <h3 style="margin:0 0 16px">Set Alerts \u2014 ${itemName}</h3>
         ${multiNotice}
         <form id="univ-alert-form">
           <div style="margin-bottom:12px">
@@ -99,29 +99,33 @@ const Modal = (() => {
             <button type="button" data-action="cancel" style="background:#2a2a4e;border:1px solid #444;color:#fff;padding:8px 16px;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center">Cancel</button>
             <button type="button" data-action="save" style="background:#1a5a8a;border:none;color:#fff;padding:8px 16px;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center" ${initialWebhook ? '' : 'disabled'}>Save</button>
           </div>
-        </form>
-      </div>`;
+        </form>`;
 
-    document.body.appendChild(overlay);
-
-    const form = overlay.querySelector('#univ-alert-form');
-    const webhookInput = overlay.querySelector('[data-field="webhook"]');
-    const saveBtn = overlay.querySelector('[data-action="save"]');
-    const errorArea = overlay.querySelector('[data-error-area]');
-    const statusEl = overlay.querySelector('[data-status]');
+    const form = container.querySelector('#univ-alert-form');
+    const webhookInput = container.querySelector('[data-field="webhook"]');
+    const saveBtn = container.querySelector('[data-action="save"]');
+    const errorArea = container.querySelector('[data-error-area]');
+    const statusEl = container.querySelector('[data-status]');
 
     // Enable/disable Save based on webhook
     webhookInput.addEventListener('input', () => {
       saveBtn.disabled = !webhookInput.value.trim();
     });
 
-    overlay.querySelector('[data-action="select-all"]').addEventListener('click', () => {
-      overlay.querySelectorAll('input[data-world-id]').forEach(cb => { cb.checked = true; });
+    container.querySelector('[data-action="select-all"]').addEventListener('click', () => {
+      container.querySelectorAll('input[data-world-id]').forEach(cb => { cb.checked = true; });
     });
-    overlay.querySelector('[data-action="clear-all"]').addEventListener('click', () => {
-      overlay.querySelectorAll('input[data-world-id]').forEach(cb => { cb.checked = false; });
+    container.querySelector('[data-action="clear-all"]').addEventListener('click', () => {
+      container.querySelectorAll('input[data-world-id]').forEach(cb => { cb.checked = false; });
     });
-    overlay.querySelector('[data-action="cancel"]').addEventListener('click', closeModal);
+    container.querySelector('[data-action="cancel"]').addEventListener('click', closeModal);
+
+    if (onBack) {
+      container.querySelector('[data-action="back"]').addEventListener('click', (e) => {
+        e.preventDefault();
+        onBack();
+      });
+    }
 
     saveBtn.addEventListener('click', async () => {
       saveBtn.disabled = true;
@@ -131,7 +135,7 @@ const Modal = (() => {
 
       const webhook = webhookInput.value.trim();
       const selectedWorldIds = new Set(
-        [...overlay.querySelectorAll('input[data-world-id]:checked')].map(cb => Number(cb.dataset.worldId))
+        [...container.querySelectorAll('input[data-world-id]:checked')].map(cb => Number(cb.dataset.worldId))
       );
       const trigger = buildTriggerFromForm(form);
       const name = form.querySelector('[data-field="name"]').value.trim();
@@ -151,7 +155,6 @@ const Modal = (() => {
 
       try {
         await onSave({ name, webhook, trigger, selectedWorldIds }, onProgress);
-        closeModal();
       } catch (err) {
         statusEl.style.display = 'none';
         errorArea.textContent = err.message;
@@ -160,6 +163,25 @@ const Modal = (() => {
         saveBtn.disabled = false;
       }
     });
+  }
+
+  function openModal({ itemId, itemName, group, onSave, multipleGroups = false }) {
+    const overlay = document.createElement('div');
+    overlay.id = 'univ-alert-modal';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:9999';
+
+    const innerContainer = document.createElement('div');
+    innerContainer.style.cssText = 'background:#1a1a2e;border-radius:8px;padding:24px;width:480px;max-height:80vh;overflow-y:auto;color:#fff';
+    overlay.appendChild(innerContainer);
+
+    document.body.appendChild(overlay);
+
+    const wrappedOnSave = async (formState, onProgress) => {
+      await onSave(formState, onProgress);
+      closeModal();
+    };
+
+    renderFormView(innerContainer, { itemId, itemName, group, onSave: wrappedOnSave, onBack: null, multipleGroups });
   }
 
   function closeModal() {
