@@ -170,12 +170,117 @@ describe('deleteGroup', () => {
   });
 });
 
+describe('renderAlertsPanel — edit re-fetch failure', () => {
+  const alert1 = { id: 'a1', itemId: 44015, worldId: 4030, name: 'My Alert', discordWebhook: 'https://wh.com',
+    triggerVersion: 0, trigger: { filters: [], mapper: 'pricePerUnit', reducer: 'min', comparison: { lt: { target: 130 } } } };
+
+  test('shows native alert when re-fetch fails on edit click', async () => {
+    setupNativeDOM();
+    const nameMap = new Map([[44015, '木棉原木']]);
+    AlertsPage.renderAlertsPanel([alert1], nameMap);
+
+    // First getAlerts (edit click re-fetch) fails
+    API.getAlerts.mockRejectedValue(new Error('Network error'));
+    const alertSpy = jest.spyOn(window, 'alert').mockImplementation(() => {});
+
+    const editBtn = document.querySelector('#univ-alert-panel [data-action="edit"]');
+    editBtn.click();
+    await new Promise(r => setTimeout(r, 0));
+
+    expect(alertSpy).toHaveBeenCalledWith('Failed to load alerts — check your connection');
+    expect(Modal.openModal).not.toHaveBeenCalled();
+    alertSpy.mockRestore();
+  });
+});
+
+describe('renderAlertsPanel — formatRule in table', () => {
+  test('displays HQ badge for triggers with hq filter', () => {
+    setupNativeDOM();
+    const hqAlert = { id: 'a1', itemId: 44015, worldId: 4030, name: 'HQ Alert', discordWebhook: 'https://wh.com',
+      triggerVersion: 0, trigger: { filters: ['hq'], mapper: 'pricePerUnit', reducer: 'min', comparison: { lt: { target: 100 } } } };
+    AlertsPage.renderAlertsPanel([hqAlert], new Map([[44015, '木棉原木']]));
+    const panel = document.getElementById('univ-alert-panel');
+    expect(panel.innerHTML).toContain('HQ');
+  });
+
+  test('displays gt comparator as >', () => {
+    setupNativeDOM();
+    const gtAlert = { id: 'a1', itemId: 44015, worldId: 4030, name: 'GT Alert', discordWebhook: 'https://wh.com',
+      triggerVersion: 0, trigger: { filters: [], mapper: 'quantity', reducer: 'max', comparison: { gt: { target: 500 } } } };
+    AlertsPage.renderAlertsPanel([gtAlert], new Map([[44015, '木棉原木']]));
+    const panel = document.getElementById('univ-alert-panel');
+    expect(panel.textContent).toContain('>');
+    expect(panel.textContent).toContain('500');
+  });
+});
+
+describe('renderAlertsPanel — world name enrichment', () => {
+  test('enriches group worlds with worldName from WorldMap', () => {
+    setupNativeDOM();
+    const alert1 = { id: 'a1', itemId: 44015, worldId: 4030, name: 'Alert', discordWebhook: 'https://wh.com',
+      triggerVersion: 0, trigger: { filters: [], mapper: 'pricePerUnit', reducer: 'min', comparison: { lt: { target: 130 } } } };
+    AlertsPage.renderAlertsPanel([alert1], new Map([[44015, '木棉原木']]));
+    const panel = document.getElementById('univ-alert-panel');
+    expect(panel.textContent).toContain('利維坦');
+  });
+});
+
+describe('init — stale panel cleanup and native content hiding', () => {
+  test('removes stale panel on init', () => {
+    const stale = document.createElement('div');
+    stale.id = 'univ-alert-panel';
+    document.body.appendChild(stale);
+    setupNativeDOM();
+
+    API.getAlerts.mockResolvedValue([]);
+    AlertsPage.init();
+
+    // Stale panel should be removed immediately (before async work)
+    // The new panel may or may not be created yet (async), but the stale one is gone
+    expect(document.querySelectorAll('#univ-alert-panel').length).toBeLessThanOrEqual(1);
+  });
+
+  test('hides native content when loading alerts', async () => {
+    setupNativeDOM();
+    API.getAlerts.mockResolvedValue([]);
+    AlertsPage.init();
+    await new Promise(r => setTimeout(r, 0));
+
+    // Native anchor should be hidden
+    const anchor = document.querySelector('a[href="/market/44015"]');
+    expect(anchor.style.display).toBe('none');
+  });
+
+  test('restores native content when getAlerts fails', async () => {
+    setupNativeDOM();
+    API.getAlerts.mockRejectedValue(new Error('fail'));
+    AlertsPage.init();
+    await new Promise(r => setTimeout(r, 0));
+
+    const anchor = document.querySelector('a[href="/market/44015"]');
+    expect(anchor.style.display).toBe('');
+  });
+});
+
 describe('delete button — retry on partial failure', () => {
   const trigger = { filters: [], mapper: 'pricePerUnit', reducer: 'min', comparison: { lt: { target: 130 } } };
   const alert1 = { id: 'a1', itemId: 44015, worldId: 4030, name: 'My Alert', discordWebhook: 'https://wh.com',
     triggerVersion: 0, trigger };
   const alert2 = { ...alert1, id: 'a2', worldId: 4031 };
   const alert3 = { ...alert1, id: 'a3', worldId: 4032 };
+
+  test('shows "Queued…" with reduced opacity immediately on delete click', () => {
+    setupNativeDOM();
+    API.deleteAlert.mockReturnValue(new Promise(() => {})); // never resolves
+    AlertsPage.renderAlertsPanel([alert1, alert2], new Map([[44015, '木棉原木']]));
+
+    const deleteBtn = document.querySelector('[data-action="delete"]');
+    deleteBtn.click();
+
+    expect(deleteBtn.textContent).toBe('Queued\u2026');
+    expect(deleteBtn.disabled).toBe(true);
+    expect(deleteBtn.style.opacity).toBe('0.7');
+  });
 
   test('shows "Retry (N remaining)" and updates pills on partial delete failure', async () => {
     setupNativeDOM();

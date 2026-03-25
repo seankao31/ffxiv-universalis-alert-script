@@ -136,6 +136,55 @@ describe('openBulkModal — form save returns to list', () => {
   });
 });
 
+describe('openBulkModal — no duplicate deletes after navigation', () => {
+  test('delete after list→form→back does not fire duplicate API calls', async () => {
+    API.deleteAlert.mockResolvedValue();
+    const groups = [{
+      itemId: 44015, name: 'Alert', discordWebhook: 'https://wh.com', trigger,
+      worlds: [{ worldId: 4030, alertId: 'a1', worldName: '利維坦' }],
+    }];
+
+    Modal.openBulkModal({ itemId: 44015, itemName: '木棉原木', groups });
+    const modal = document.querySelector('#univ-alert-modal');
+
+    // Navigate: list → form → back to list
+    modal.querySelector('[data-action="new-alert"]').click();
+    modal.querySelector('[data-action="back"]').click();
+
+    // Now click delete — should only fire once
+    modal.querySelector('[data-action="delete"]').click();
+    await new Promise(r => setTimeout(r, 0));
+
+    expect(API.deleteAlert).toHaveBeenCalledTimes(1);
+  });
+
+  test('delete after multiple round-trips still fires once per world', async () => {
+    API.deleteAlert.mockResolvedValue();
+    const groups = [{
+      itemId: 44015, name: 'Alert', discordWebhook: 'https://wh.com', trigger,
+      worlds: [
+        { worldId: 4030, alertId: 'a1', worldName: '利維坦' },
+        { worldId: 4031, alertId: 'a2', worldName: '鳳凰' },
+      ],
+    }];
+
+    Modal.openBulkModal({ itemId: 44015, itemName: '木棉原木', groups });
+    const modal = document.querySelector('#univ-alert-modal');
+
+    // Navigate back and forth 3 times
+    for (let i = 0; i < 3; i++) {
+      modal.querySelector('[data-action="new-alert"]').click();
+      modal.querySelector('[data-action="back"]').click();
+    }
+
+    modal.querySelector('[data-action="delete"]').click();
+    await new Promise(r => setTimeout(r, 0));
+
+    // 2 worlds = 2 calls, not 2×4 = 8
+    expect(API.deleteAlert).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe('openBulkModal — delete last group transitions to form', () => {
   test('transitions to blank form when last group is deleted', async () => {
     API.deleteAlert.mockResolvedValue();

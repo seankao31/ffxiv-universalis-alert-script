@@ -83,8 +83,11 @@ const AlertsPage = (() => {
 
       if (action === 'delete') {
         e.target.disabled = true;
+        e.target.textContent = 'Queued\u2026';
+        e.target.style.opacity = '0.7';
         const { failures } = await deleteGroup(group, ({ completed, total }) => {
           e.target.textContent = `Deleting ${completed}/${total}...`;
+          e.target.style.opacity = '1';
         });
         if (failures.length === 0) {
           e.target.closest('tr').remove();
@@ -93,6 +96,7 @@ const AlertsPage = (() => {
           group.worlds = failures;
           e.target.textContent = `Retry (${failures.length} remaining)`;
           e.target.disabled = false;
+          e.target.style.opacity = '1';
           // Update world pills in the row
           const pillsCell = e.target.closest('tr').querySelector('td:nth-child(3)');
           pillsCell.innerHTML = failures

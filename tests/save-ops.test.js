@@ -155,4 +155,62 @@ describe('executeSaveOps', () => {
       { phase: 'creating', completed: 2, total: 2 },
     ]);
   });
+
+  test('partial POST failure: error only names the failed worlds', async () => {
+    // First POST succeeds, second fails
+    jest.spyOn(API, 'createAlert')
+      .mockResolvedValueOnce({ id: 'new1' })
+      .mockRejectedValueOnce(new Error('500'));
+    jest.spyOn(API, 'deleteAlert').mockResolvedValue();
+
+    await expect(executeSaveOps(ops, 44015, formState)).rejects.toThrow(
+      'Failed to save alerts for: 鳳凰'
+    );
+    // Deletes should NOT have run since POSTs partially failed
+    expect(API.deleteAlert).not.toHaveBeenCalled();
+  });
+
+  test('partial DELETE failure: error only names the failed worlds', async () => {
+    const multiDeleteOps = {
+      postsNeeded: [],
+      deletesAfterSuccess: [
+        { alertId: 'old-1', worldId: 4028, worldName: '伊弗利特' },
+        { alertId: 'old-2', worldId: 4029, worldName: '泰坦' },
+        { alertId: 'old-3', worldId: 4030, worldName: '利維坦' },
+      ],
+    };
+    jest.spyOn(API, 'createAlert').mockResolvedValue({ id: 'new' });
+    // First delete succeeds, second fails, third succeeds
+    jest.spyOn(API, 'deleteAlert')
+      .mockResolvedValueOnce()
+      .mockRejectedValueOnce(new Error('500'))
+      .mockResolvedValueOnce();
+
+    await expect(executeSaveOps(multiDeleteOps, 44015, formState)).rejects.toThrow(
+      'Alerts saved, but failed to remove old alerts for: 泰坦'
+    );
+  });
+
+  test('works without onProgress callback', async () => {
+    jest.spyOn(API, 'createAlert').mockResolvedValue({ id: 'new' });
+    jest.spyOn(API, 'deleteAlert').mockResolvedValue();
+    // Should not throw when onProgress is undefined
+    await expect(executeSaveOps(ops, 44015, formState)).resolves.toBeUndefined();
+  });
+
+  test('uses worldId as fallback name when worldName is missing', async () => {
+    const opsNoNames = {
+      postsNeeded: [
+        { worldId: 4030 },
+        { worldId: 4031 },
+      ],
+      deletesAfterSuccess: [],
+    };
+    jest.spyOn(API, 'createAlert').mockRejectedValue(new Error('fail'));
+    jest.spyOn(API, 'deleteAlert').mockResolvedValue();
+
+    await expect(executeSaveOps(opsNoNames, 44015, formState)).rejects.toThrow(
+      'Failed to save alerts for: 4030, 4031'
+    );
+  });
 });

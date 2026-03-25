@@ -212,8 +212,13 @@ const Modal = (() => {
         <button data-action="new-alert" style="background:#1a5a2a;border:none;color:#fff;padding:8px 20px;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center">New Alert</button>
       </div>`;
 
-    // Event delegation
-    container.addEventListener('click', (e) => {
+    // Event delegation — remove stale listener from previous render to avoid duplicates.
+    // innerHTML = '' only removes child nodes, not listeners on the container itself,
+    // so list→form→back→list stacks duplicate handlers without this cleanup.
+    if (container._listClickHandler) {
+      container.removeEventListener('click', container._listClickHandler);
+    }
+    const handler = (e) => {
       const action = e.target.dataset.action;
       if (action === 'close') { onClose(); return; }
       if (action === 'new-alert') { onNew(); return; }
@@ -222,7 +227,9 @@ const Modal = (() => {
       if (!group) return;
       if (action === 'edit') onEdit(group);
       if (action === 'delete') onDelete(group, idx, e.target);
-    });
+    };
+    container._listClickHandler = handler;
+    container.addEventListener('click', handler);
   }
 
   function openBulkModal({ itemId, itemName, groups }) {
@@ -350,6 +357,8 @@ const Modal = (() => {
 
   async function handleListDelete(group, idx, btn, container, onAllDeleted) {
     btn.disabled = true;
+    btn.textContent = 'Queued\u2026';
+    btn.style.opacity = '0.7';
     const total = group.worlds.length;
     let completed = 0;
 
@@ -359,6 +368,7 @@ const Modal = (() => {
       } finally {
         completed++;
         btn.textContent = `Deleting ${completed}/${total}...`;
+        btn.style.opacity = '1';
       }
     }));
 
@@ -377,6 +387,7 @@ const Modal = (() => {
       group.worlds = failures;
       btn.textContent = `Retry (${failures.length} remaining)`;
       btn.disabled = false;
+      btn.style.opacity = '1';
       // Update world pills
       const row = container.querySelector(`[data-group-row="${idx}"]`);
       const pillsContainer = row.querySelector('[data-world-pills]');

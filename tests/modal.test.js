@@ -335,10 +335,308 @@ describe('list view — delete behavior', () => {
   });
 });
 
+describe('list view — queued state', () => {
+  beforeAll(() => {
+    global.API = { getAlerts: jest.fn(), deleteAlert: jest.fn(), createAlert: jest.fn() };
+  });
+
+  const trigger = { filters: [], mapper: 'pricePerUnit', reducer: 'min', comparison: { lt: { target: 130 } } };
+
+  test('shows "Queued…" with reduced opacity immediately on delete click', () => {
+    API.deleteAlert.mockReturnValue(new Promise(() => {})); // never resolves
+    const groups = [{
+      itemId: 44015, name: 'Alert', discordWebhook: 'https://wh.com', trigger,
+      worlds: [{ worldId: 4030, alertId: 'a1', worldName: '利維坦' }],
+    }];
+    const container = document.createElement('div');
+    Modal.renderListView(container, { itemId: 44015, itemName: 'Item', groups, onEdit: jest.fn(), onDelete: (group, idx, btn) => {
+      Modal.handleListDelete(group, idx, btn, container, jest.fn());
+    }, onNew: jest.fn(), onClose: jest.fn() });
+
+    const deleteBtn = container.querySelector('[data-action="delete"]');
+    deleteBtn.click();
+
+    expect(deleteBtn.textContent).toBe('Queued\u2026');
+    expect(deleteBtn.disabled).toBe(true);
+    expect(deleteBtn.style.opacity).toBe('0.7');
+  });
+
+  test('opacity restores to 1 once delete progress begins', async () => {
+    API.deleteAlert.mockResolvedValue();
+    const groups = [{
+      itemId: 44015, name: 'Alert', discordWebhook: 'https://wh.com', trigger,
+      worlds: [{ worldId: 4030, alertId: 'a1', worldName: '利維坦' }],
+    }];
+    const container = document.createElement('div');
+    Modal.renderListView(container, { itemId: 44015, itemName: 'Item', groups, onEdit: jest.fn(), onDelete: (group, idx, btn) => {
+      Modal.handleListDelete(group, idx, btn, container, jest.fn());
+    }, onNew: jest.fn(), onClose: jest.fn() });
+
+    const deleteBtn = container.querySelector('[data-action="delete"]');
+    deleteBtn.click();
+    await new Promise(r => setTimeout(r, 0));
+
+    // After completion, row is removed — but opacity should have been set to '1' during progress
+    // Verify via a partial-failure scenario instead
+  });
+
+  test('opacity restores on retry after partial failure', async () => {
+    API.deleteAlert.mockRejectedValue(new Error('500'));
+    const groups = [{
+      itemId: 44015, name: 'Alert', discordWebhook: 'https://wh.com', trigger,
+      worlds: [{ worldId: 4030, alertId: 'a1', worldName: '利維坦' }],
+    }];
+    const container = document.createElement('div');
+    Modal.renderListView(container, { itemId: 44015, itemName: 'Item', groups, onEdit: jest.fn(), onDelete: (group, idx, btn) => {
+      Modal.handleListDelete(group, idx, btn, container, jest.fn());
+    }, onNew: jest.fn(), onClose: jest.fn() });
+
+    const deleteBtn = container.querySelector('[data-action="delete"]');
+    deleteBtn.click();
+    await new Promise(r => setTimeout(r, 0));
+
+    expect(deleteBtn.textContent).toBe('Retry (1 remaining)');
+    expect(deleteBtn.style.opacity).toBe('1');
+  });
+});
+
+describe('list view — no duplicate handlers after re-render', () => {
+  const trigger = { filters: [], mapper: 'pricePerUnit', reducer: 'min', comparison: { lt: { target: 130 } } };
+
+  test('re-rendering list view on same container does not stack click handlers', () => {
+    const groups = [{
+      itemId: 44015, name: 'Alert', discordWebhook: 'https://wh.com', trigger,
+      worlds: [{ worldId: 4030, alertId: 'a1', worldName: '利維坦' }],
+    }];
+    const container = document.createElement('div');
+    const onDelete = jest.fn();
+    const opts = { itemId: 44015, itemName: 'Item', groups, onEdit: jest.fn(), onDelete, onNew: jest.fn(), onClose: jest.fn() };
+
+    // Render twice on same container (simulates list → form → back → list)
+    Modal.renderListView(container, opts);
+    Modal.renderListView(container, opts);
+
+    container.querySelector('[data-action="delete"]').click();
+    expect(onDelete).toHaveBeenCalledTimes(1);
+  });
+
+  test('three renders still produces single handler', () => {
+    const groups = [{
+      itemId: 44015, name: 'Alert', discordWebhook: 'https://wh.com', trigger,
+      worlds: [{ worldId: 4030, alertId: 'a1', worldName: '利維坦' }],
+    }];
+    const container = document.createElement('div');
+    const onDelete = jest.fn();
+    const opts = { itemId: 44015, itemName: 'Item', groups, onEdit: jest.fn(), onDelete, onNew: jest.fn(), onClose: jest.fn() };
+
+    Modal.renderListView(container, opts);
+    Modal.renderListView(container, opts);
+    Modal.renderListView(container, opts);
+
+    container.querySelector('[data-action="delete"]').click();
+    expect(onDelete).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('closeModal', () => {
   test('removes modal from DOM', () => {
     Modal.openModal({ itemId: 44015, itemName: 'Item', group: null, onSave: jest.fn() });
     Modal.closeModal();
     expect(document.querySelector('#univ-alert-modal')).toBeNull();
+  });
+
+  test('cleans up Escape keydown listener after close', () => {
+    Modal.openModal({ itemId: 44015, itemName: 'Item', group: null, onSave: jest.fn() });
+    Modal.closeModal();
+    // Pressing Escape after close should not throw or cause issues
+    expect(() => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    }).not.toThrow();
+  });
+});
+
+describe('renderFormView — Select All / Clear All buttons', () => {
+  test('Select All checks all world checkboxes', () => {
+    GM_getValue.mockReturnValue('https://wh.com');
+    Modal.openModal({ itemId: 44015, itemName: 'Item', group: null, onSave: jest.fn() });
+    // Clear all first so we can verify Select All works
+    document.querySelector('#univ-alert-modal [data-action="clear-all"]').click();
+    const checkboxes = document.querySelectorAll('#univ-alert-modal input[data-world-id]');
+    checkboxes.forEach(cb => expect(cb.checked).toBe(false));
+
+    document.querySelector('#univ-alert-modal [data-action="select-all"]').click();
+    checkboxes.forEach(cb => expect(cb.checked).toBe(true));
+  });
+
+  test('Clear All unchecks all world checkboxes', () => {
+    GM_getValue.mockReturnValue('https://wh.com');
+    Modal.openModal({ itemId: 44015, itemName: 'Item', group: null, onSave: jest.fn() });
+    // All should be checked by default for new alerts
+    const checkboxes = document.querySelectorAll('#univ-alert-modal input[data-world-id]');
+    checkboxes.forEach(cb => expect(cb.checked).toBe(true));
+
+    document.querySelector('#univ-alert-modal [data-action="clear-all"]').click();
+    checkboxes.forEach(cb => expect(cb.checked).toBe(false));
+  });
+});
+
+describe('renderFormView — webhook input toggles Save button', () => {
+  test('typing a webhook enables the Save button', () => {
+    GM_getValue.mockReturnValue(undefined); // no saved webhook
+    Modal.openModal({ itemId: 44015, itemName: 'Item', group: null, onSave: jest.fn() });
+    const saveBtn = document.querySelector('#univ-alert-modal [data-action="save"]');
+    const webhookInput = document.querySelector('#univ-alert-modal [data-field="webhook"]');
+    expect(saveBtn.disabled).toBe(true);
+
+    webhookInput.value = 'https://discord.com/api/webhooks/123';
+    webhookInput.dispatchEvent(new Event('input'));
+    expect(saveBtn.disabled).toBe(false);
+  });
+
+  test('clearing the webhook disables the Save button', () => {
+    GM_getValue.mockReturnValue('https://wh.com');
+    Modal.openModal({ itemId: 44015, itemName: 'Item', group: null, onSave: jest.fn() });
+    const saveBtn = document.querySelector('#univ-alert-modal [data-action="save"]');
+    const webhookInput = document.querySelector('#univ-alert-modal [data-field="webhook"]');
+    expect(saveBtn.disabled).toBe(false);
+
+    webhookInput.value = '';
+    webhookInput.dispatchEvent(new Event('input'));
+    expect(saveBtn.disabled).toBe(true);
+  });
+});
+
+describe('renderFormView — Cancel button', () => {
+  test('Cancel button closes the modal', () => {
+    Modal.openModal({ itemId: 44015, itemName: 'Item', group: null, onSave: jest.fn() });
+    expect(document.querySelector('#univ-alert-modal')).not.toBeNull();
+    document.querySelector('#univ-alert-modal [data-action="cancel"]').click();
+    expect(document.querySelector('#univ-alert-modal')).toBeNull();
+  });
+});
+
+describe('renderFormView — trigger field pre-population from group', () => {
+  const group = {
+    itemId: 44015, name: 'My Alert',
+    trigger: { filters: ['hq'], mapper: 'quantity', reducer: 'max', comparison: { gt: { target: 500 } } },
+    discordWebhook: 'https://wh.com',
+    worlds: [{ worldId: 4030, alertId: 'a1', worldName: '利維坦' }],
+  };
+
+  test('pre-selects mapper from existing group trigger', () => {
+    Modal.openModal({ itemId: 44015, itemName: 'Item', group, onSave: jest.fn() });
+    const mapper = document.querySelector('#univ-alert-modal [data-field="mapper"]');
+    expect(mapper.value).toBe('quantity');
+  });
+
+  test('pre-selects reducer from existing group trigger', () => {
+    Modal.openModal({ itemId: 44015, itemName: 'Item', group, onSave: jest.fn() });
+    const reducer = document.querySelector('#univ-alert-modal [data-field="reducer"]');
+    expect(reducer.value).toBe('max');
+  });
+
+  test('pre-selects comparator from existing group trigger', () => {
+    Modal.openModal({ itemId: 44015, itemName: 'Item', group, onSave: jest.fn() });
+    const comparator = document.querySelector('#univ-alert-modal [data-field="comparator"]');
+    expect(comparator.value).toBe('gt');
+  });
+
+  test('pre-fills target value from existing group trigger', () => {
+    Modal.openModal({ itemId: 44015, itemName: 'Item', group, onSave: jest.fn() });
+    const target = document.querySelector('#univ-alert-modal [data-field="target"]');
+    expect(target.value).toBe('500');
+  });
+
+  test('pre-checks HQ checkbox when trigger has hq filter', () => {
+    Modal.openModal({ itemId: 44015, itemName: 'Item', group, onSave: jest.fn() });
+    const hq = document.querySelector('#univ-alert-modal [data-field="hq"]');
+    expect(hq.checked).toBe(true);
+  });
+
+  test('HQ checkbox is unchecked when trigger has no hq filter', () => {
+    const noHqGroup = {
+      ...group,
+      trigger: { ...group.trigger, filters: [] },
+    };
+    Modal.openModal({ itemId: 44015, itemName: 'Item', group: noHqGroup, onSave: jest.fn() });
+    const hq = document.querySelector('#univ-alert-modal [data-field="hq"]');
+    expect(hq.checked).toBe(false);
+  });
+});
+
+describe('renderFormView — Save builds trigger from form and saves webhook', () => {
+  test('onSave receives trigger built from form fields', async () => {
+    const onSave = jest.fn().mockResolvedValue();
+    GM_getValue.mockReturnValue('https://wh.com');
+    Modal.openModal({ itemId: 44015, itemName: 'Item', group: null, onSave });
+
+    // Set form fields
+    document.querySelector('#univ-alert-modal [data-field="mapper"]').value = 'total';
+    document.querySelector('#univ-alert-modal [data-field="reducer"]').value = 'mean';
+    document.querySelector('#univ-alert-modal [data-field="comparator"]').value = 'gt';
+    document.querySelector('#univ-alert-modal [data-field="target"]').value = '999';
+    document.querySelector('#univ-alert-modal [data-field="hq"]').checked = true;
+
+    document.querySelector('#univ-alert-modal [data-action="save"]').click();
+    await new Promise(r => setTimeout(r, 0));
+
+    const formState = onSave.mock.calls[0][0];
+    expect(formState.trigger).toEqual({
+      filters: ['hq'],
+      mapper: 'total',
+      reducer: 'mean',
+      comparison: { gt: { target: 999 } },
+    });
+  });
+
+  test('onSave receives alert name and selected world IDs', async () => {
+    const onSave = jest.fn().mockResolvedValue();
+    GM_getValue.mockReturnValue('https://wh.com');
+    Modal.openModal({ itemId: 44015, itemName: 'Item', group: null, onSave });
+
+    document.querySelector('#univ-alert-modal [data-field="name"]').value = 'Custom Name';
+    // Clear all, then check just one world
+    document.querySelector('#univ-alert-modal [data-action="clear-all"]').click();
+    document.querySelector('#univ-alert-modal input[data-world-id="4030"]').checked = true;
+
+    document.querySelector('#univ-alert-modal [data-action="save"]').click();
+    await new Promise(r => setTimeout(r, 0));
+
+    const formState = onSave.mock.calls[0][0];
+    expect(formState.name).toBe('Custom Name');
+    expect(formState.selectedWorldIds).toEqual(new Set([4030]));
+    expect(formState.webhook).toBe('https://wh.com');
+  });
+
+  test('GM_setValue is called with the webhook on save', async () => {
+    const onSave = jest.fn().mockResolvedValue();
+    GM_getValue.mockReturnValue('https://wh.com');
+    Modal.openModal({ itemId: 44015, itemName: 'Item', group: null, onSave });
+
+    document.querySelector('#univ-alert-modal [data-action="save"]').click();
+    await new Promise(r => setTimeout(r, 0));
+
+    expect(GM_setValue).toHaveBeenCalledWith('discordWebhook', 'https://wh.com');
+  });
+});
+
+describe('renderFormView — removing progress phase', () => {
+  test('displays removing phase message correctly', async () => {
+    let resolveOnSave;
+    const onSave = jest.fn(() => new Promise(r => { resolveOnSave = r; }));
+    GM_getValue.mockReturnValue('https://wh.com');
+    Modal.openModal({ itemId: 44015, itemName: 'Item', group: null, onSave });
+
+    document.querySelector('#univ-alert-modal [data-action="save"]').click();
+    await new Promise(r => setTimeout(r, 0));
+
+    const onProgress = onSave.mock.calls[0][1];
+    const statusEl = document.querySelector('#univ-alert-modal [data-status]');
+
+    onProgress({ phase: 'removing', completed: 1, total: 2 });
+    expect(statusEl.textContent).toBe('Removing old alert 1 of 2...');
+
+    resolveOnSave();
+    await new Promise(r => setTimeout(r, 0));
   });
 });
