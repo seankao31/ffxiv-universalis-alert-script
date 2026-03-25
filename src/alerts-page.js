@@ -215,55 +215,40 @@ const AlertsPage = (() => {
   }
 
   function init() {
-    // Remove stale panel if user re-navigated
-    const stale = document.getElementById('univ-alert-panel');
-    if (stale) stale.remove();
+    function findContentDiv() {
+      const main = document.querySelector('main');
+      if (!main) return null;
+      const divs = main.querySelectorAll(':scope > div');
+      return divs.length >= 2 ? divs[1] : null;
+    }
 
-    async function run() {
-      const nameMap = scrapeItemNames();
-
-      // Hide native content
-      document.querySelectorAll('body > *:not(#univ-alert-panel)').forEach(el => {
-        if (el.tagName !== 'SCRIPT' && el.id !== 'univ-alert-panel') el.style.display = 'none';
-      });
-
-      // Create a container early so both success and error paths can render into it
-      const container = document.createElement('div');
-      document.body.prepend(container);
+    async function run(contentDiv) {
+      const nameMap = await fetchItemNames();
 
       let alerts;
       try {
         alerts = await _API().getAlerts();
       } catch {
-        await handleInitError(container);
-        // Restore native content
-        document.querySelectorAll('body > *:not(#univ-alert-panel)').forEach(el => { el.style.display = ''; });
+        await handleInitError(contentDiv);
         return;
       }
 
-      renderAlertsPanel(alerts, nameMap, container);
+      renderAlertsPanel(alerts, nameMap, contentDiv);
     }
 
-    if (document.querySelector('a[href^="/market/"]')) {
-      run(); // market links already in DOM (SSR/CSR already rendered)
+    const contentDiv = findContentDiv();
+    if (contentDiv) {
+      run(contentDiv);
       return;
     }
 
-    // Not yet rendered — observe for market links (SPA navigation case)
-    const TIMEOUT_MS = 10000;
-    const startedAt = Date.now();
-
+    // <main> not yet rendered — wait for SPA navigation
     const observer = new MutationObserver(() => {
-      if (!document.querySelector('a[href^="/market/"]')) {
-        if (Date.now() - startedAt > TIMEOUT_MS) {
-          observer.disconnect(); // no alerts — leave native page intact
-        }
-        return;
-      }
+      const div = findContentDiv();
+      if (!div) return;
       observer.disconnect();
-      run();
+      run(div);
     });
-
     observer.observe(document.body, { childList: true, subtree: true });
   }
 

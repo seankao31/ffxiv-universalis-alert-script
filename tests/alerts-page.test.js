@@ -230,40 +230,107 @@ describe('renderAlertsPanel — world name enrichment', () => {
   });
 });
 
-describe('init — stale panel cleanup and native content hiding', () => {
-  test('removes stale panel on init', () => {
-    const stale = document.createElement('div');
-    stale.id = 'univ-alert-panel';
-    document.body.appendChild(stale);
-    setupNativeDOM();
+describe('init — renders into <main> content div', () => {
+  function setupAccountDOM() {
+    document.body.innerHTML = `
+      <main>
+        <div><button>Account</button></div>
+        <div id="content-div"><p>Native content</p></div>
+      </main>`;
+  }
 
-    API.getAlerts.mockResolvedValue([]);
-    AlertsPage.init();
+  test('renders alerts panel into second div of <main>', async () => {
+    setupAccountDOM();
+    const alert1 = { id: 'a1', itemId: 44015, worldId: 4030, name: 'Alert', discordWebhook: 'https://wh.com',
+      triggerVersion: 0, trigger: { filters: [], mapper: 'pricePerUnit', reducer: 'min', comparison: { lt: { target: 130 } } } };
+    API.getAlerts.mockResolvedValue([alert1]);
+    fetch.mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve('<html><body><a href="/market/44015">木棉原木</a></body></html>'),
+    });
 
-    // Stale panel should be removed immediately (before async work)
-    // The new panel may or may not be created yet (async), but the stale one is gone
-    expect(document.querySelectorAll('#univ-alert-panel').length).toBeLessThanOrEqual(1);
-  });
-
-  test('hides native content when loading alerts', async () => {
-    setupNativeDOM();
-    API.getAlerts.mockResolvedValue([]);
     AlertsPage.init();
     await new Promise(r => setTimeout(r, 0));
 
-    // Native anchor should be hidden
-    const anchor = document.querySelector('a[href="/market/44015"]');
-    expect(anchor.style.display).toBe('none');
+    const contentDiv = document.querySelector('main > div:nth-child(2)');
+    expect(contentDiv.querySelector('#univ-alert-panel')).not.toBeNull();
+    expect(contentDiv.textContent).toContain('木棉原木');
   });
 
-  test('restores native content when getAlerts fails', async () => {
-    setupNativeDOM();
+  test('renders error into content div when getAlerts fails', async () => {
+    setupAccountDOM();
     API.getAlerts.mockRejectedValue(new Error('fail'));
+    fetch.mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve('<html><body></body></html>'),
+    });
+
     AlertsPage.init();
     await new Promise(r => setTimeout(r, 0));
 
-    const anchor = document.querySelector('a[href="/market/44015"]');
-    expect(anchor.style.display).toBe('');
+    const contentDiv = document.querySelector('main > div:nth-child(2)');
+    const errorEl = contentDiv.querySelector('[data-init-error]');
+    expect(errorEl).not.toBeNull();
+    expect(errorEl.textContent).toContain('Failed to load existing alerts');
+  });
+
+  test('does not hide native body content', async () => {
+    setupAccountDOM();
+    API.getAlerts.mockResolvedValue([]);
+    fetch.mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve('<html><body></body></html>'),
+    });
+
+    AlertsPage.init();
+    await new Promise(r => setTimeout(r, 0));
+
+    const navDiv = document.querySelector('main > div:first-child');
+    expect(navDiv.style.display).not.toBe('none');
+  });
+
+  test('injectTab click triggers init — renders panel into content div', async () => {
+    setupAccountDOM();
+    window.history.pushState = jest.fn();
+    const alert1 = { id: 'a1', itemId: 44015, worldId: 4030, name: 'Alert', discordWebhook: 'https://wh.com',
+      triggerVersion: 0, trigger: { filters: [], mapper: 'pricePerUnit', reducer: 'min', comparison: { lt: { target: 130 } } } };
+    fetch.mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve('<html><body><a href="/market/44015">木棉原木</a></body></html>'),
+    });
+    API.getAlerts.mockResolvedValue([alert1]);
+
+    AlertsPage.injectTab();
+    const btn = document.querySelector('#univ-bulk-alerts-tab');
+    btn.click();
+    await new Promise(r => setTimeout(r, 0));
+
+    const contentDiv = document.querySelector('main > div:nth-child(2)');
+    expect(contentDiv.querySelector('#univ-alert-panel')).not.toBeNull();
+  });
+
+  test('waits for <main> with 2 child divs via MutationObserver', async () => {
+    document.body.innerHTML = '<div>Loading...</div>';
+    fetch.mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve('<html><body></body></html>'),
+    });
+    API.getAlerts.mockResolvedValue([]);
+
+    AlertsPage.init();
+
+    // No panel yet
+    expect(document.querySelector('#univ-alert-panel')).toBeNull();
+
+    // Simulate SPA render — add <main> with 2 child divs
+    const main = document.createElement('main');
+    main.innerHTML = '<div><button>Account</button></div><div></div>';
+    document.body.appendChild(main);
+
+    await new Promise(r => setTimeout(r, 0));
+
+    const contentDiv = main.querySelector(':scope > div:nth-child(2)');
+    expect(contentDiv.querySelector('#univ-alert-panel')).not.toBeNull();
   });
 });
 
