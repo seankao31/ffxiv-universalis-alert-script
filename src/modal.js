@@ -1,6 +1,14 @@
 const Modal = (() => {
   const _WorldMap = typeof WorldMap !== 'undefined' ? WorldMap : require('./worldmap');
 
+  const _apiModule = typeof module !== 'undefined' ? require('./api') : null;
+  const _groupingModule = typeof module !== 'undefined' ? require('./grouping') : null;
+  const _saveOpsModule = typeof module !== 'undefined' ? require('./save-ops') : null;
+
+  function _API() { return typeof API !== 'undefined' ? API : _apiModule; }
+  function _Grouping() { return typeof Grouping !== 'undefined' ? Grouping : _groupingModule; }
+  function _SaveOps() { return typeof SaveOps !== 'undefined' ? SaveOps : _saveOpsModule; }
+
   const METRIC_LABELS = { pricePerUnit: 'Price Per Unit', quantity: 'Quantity', total: 'Total' };
   const MAPPER_VALUES = ['pricePerUnit', 'quantity', 'total'];
   const REDUCER_VALUES = ['min', 'max', 'mean'];
@@ -258,7 +266,45 @@ const Modal = (() => {
     }
   }
 
-  return { openModal, closeModal, formatRule, renderListView };
+  async function handleListDelete(group, idx, btn, container, onAllDeleted) {
+    btn.disabled = true;
+    const total = group.worlds.length;
+    let completed = 0;
+
+    const results = await Promise.allSettled(group.worlds.map(async (w) => {
+      try {
+        return await _API().deleteAlert(w.alertId);
+      } finally {
+        completed++;
+        btn.textContent = `Deleting ${completed}/${total}...`;
+      }
+    }));
+
+    const failures = results
+      .map((r, i) => r.status === 'rejected' ? group.worlds[i] : null)
+      .filter(Boolean);
+
+    if (failures.length === 0) {
+      const row = container.querySelector(`[data-group-row="${idx}"]`);
+      if (row) row.remove();
+      // Check if all groups deleted
+      if (!container.querySelector('[data-group-row]')) {
+        onAllDeleted();
+      }
+    } else {
+      group.worlds = failures;
+      btn.textContent = `Retry (${failures.length} remaining)`;
+      btn.disabled = false;
+      // Update world pills
+      const row = container.querySelector(`[data-group-row="${idx}"]`);
+      const pillsContainer = row.querySelector('[data-world-pills]');
+      pillsContainer.innerHTML = failures
+        .map(w => `<span data-world-pill style="background:#1a3a5c;border-radius:12px;padding:2px 8px;font-size:12px;margin:2px;display:inline-block">${w.worldName || w.worldId}</span>`)
+        .join('');
+    }
+  }
+
+  return { openModal, closeModal, formatRule, renderListView, handleListDelete };
 })();
 
 if (typeof module !== 'undefined') module.exports = Modal;

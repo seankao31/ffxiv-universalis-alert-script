@@ -282,6 +282,59 @@ describe('renderListView', () => {
   });
 });
 
+describe('list view — delete behavior', () => {
+  beforeAll(() => {
+    global.API = { getAlerts: jest.fn(), deleteAlert: jest.fn(), createAlert: jest.fn() };
+  });
+
+  const trigger = { filters: [], mapper: 'pricePerUnit', reducer: 'min', comparison: { lt: { target: 130 } } };
+
+  test('removes row on successful delete', async () => {
+    API.deleteAlert.mockResolvedValue();
+    const groups = [{
+      itemId: 44015, name: 'Alert', discordWebhook: 'https://wh.com', trigger,
+      worlds: [{ worldId: 4030, alertId: 'a1', worldName: '利維坦' }],
+    }];
+    const container = document.createElement('div');
+    const onDelete = jest.fn();
+    Modal.renderListView(container, { itemId: 44015, itemName: 'Item', groups, onEdit: jest.fn(), onDelete: (group, idx, btn) => {
+      Modal.handleListDelete(group, idx, btn, container, jest.fn());
+    }, onNew: jest.fn(), onClose: jest.fn() });
+
+    const deleteBtn = container.querySelector('[data-action="delete"]');
+    deleteBtn.click();
+    await new Promise(r => setTimeout(r, 0));
+
+    expect(container.querySelector('[data-group-row="0"]')).toBeNull();
+  });
+
+  test('shows retry text on partial failure', async () => {
+    API.deleteAlert.mockResolvedValueOnce().mockRejectedValueOnce(new Error('500'));
+    const groups = [{
+      itemId: 44015, name: 'Alert', discordWebhook: 'https://wh.com', trigger,
+      worlds: [
+        { worldId: 4030, alertId: 'a1', worldName: '利維坦' },
+        { worldId: 4031, alertId: 'a2', worldName: '鳳凰' },
+      ],
+    }];
+    const container = document.createElement('div');
+    Modal.renderListView(container, { itemId: 44015, itemName: 'Item', groups, onEdit: jest.fn(), onDelete: (group, idx, btn) => {
+      Modal.handleListDelete(group, idx, btn, container, jest.fn());
+    }, onNew: jest.fn(), onClose: jest.fn() });
+
+    const deleteBtn = container.querySelector('[data-action="delete"]');
+    deleteBtn.click();
+    await new Promise(r => setTimeout(r, 0));
+
+    expect(deleteBtn.textContent).toBe('Retry (1 remaining)');
+    expect(deleteBtn.disabled).toBe(false);
+    // World pills should only show the failed world
+    const pills = container.querySelectorAll('[data-group-row="0"] [data-world-pill]');
+    expect(pills).toHaveLength(1);
+    expect(pills[0].textContent).toBe('鳳凰');
+  });
+});
+
 describe('closeModal', () => {
   test('removes modal from DOM', () => {
     Modal.openModal({ itemId: 44015, itemName: 'Item', group: null, onSave: jest.fn() });
