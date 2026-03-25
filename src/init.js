@@ -4,8 +4,11 @@ const Init = (() => {
       if (pathname.split('/').length === 3) { // /market/{id} only, not sub-paths
         MarketPage.init();
       }
-    } else if (pathname === '/account/alerts') {
-      AlertsPage.init();
+    } else if (pathname.startsWith('/account/') && pathname.split('/').length === 3) {
+      AlertsPage.injectTab();
+      if (pathname === '/account/bulk-alerts') {
+        AlertsPage.init();
+      }
     }
   }
 

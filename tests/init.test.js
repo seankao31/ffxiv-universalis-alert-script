@@ -3,7 +3,7 @@
 // We use jest.isolateModules to get a fresh copy per test.
 
 global.MarketPage = { init: jest.fn() };
-global.AlertsPage = { init: jest.fn() };
+global.AlertsPage = { init: jest.fn(), injectTab: jest.fn() };
 
 function requireInit() {
   let Init;
@@ -21,6 +21,7 @@ beforeEach(() => {
   document.body.innerHTML = '<div></div>';
   MarketPage.init.mockReset();
   AlertsPage.init.mockReset();
+  AlertsPage.injectTab.mockReset();
 });
 
 describe('route — market page dispatch', () => {
@@ -47,13 +48,29 @@ describe('route — market page dispatch', () => {
   });
 });
 
-describe('route — alerts page dispatch', () => {
-  test('routes /account/alerts to AlertsPage.init()', () => {
+describe('route — account page dispatch', () => {
+  test('routes /account/bulk-alerts to both injectTab and init', () => {
+    delete window.location;
+    window.location = { pathname: '/account/bulk-alerts' };
+    requireInit();
+    expect(AlertsPage.injectTab).toHaveBeenCalled();
+    expect(AlertsPage.init).toHaveBeenCalled();
+  });
+
+  test('routes /account/alerts to injectTab only (native page preserved)', () => {
     delete window.location;
     window.location = { pathname: '/account/alerts' };
     requireInit();
-    expect(AlertsPage.init).toHaveBeenCalled();
-    expect(MarketPage.init).not.toHaveBeenCalled();
+    expect(AlertsPage.injectTab).toHaveBeenCalled();
+    expect(AlertsPage.init).not.toHaveBeenCalled();
+  });
+
+  test('routes /account/characters to injectTab only', () => {
+    delete window.location;
+    window.location = { pathname: '/account/characters' };
+    requireInit();
+    expect(AlertsPage.injectTab).toHaveBeenCalled();
+    expect(AlertsPage.init).not.toHaveBeenCalled();
   });
 });
 
@@ -64,6 +81,7 @@ describe('route — no-op paths', () => {
     requireInit();
     expect(MarketPage.init).not.toHaveBeenCalled();
     expect(AlertsPage.init).not.toHaveBeenCalled();
+    expect(AlertsPage.injectTab).not.toHaveBeenCalled();
   });
 
   test('does nothing for unrelated path', () => {
@@ -72,13 +90,14 @@ describe('route — no-op paths', () => {
     requireInit();
     expect(MarketPage.init).not.toHaveBeenCalled();
     expect(AlertsPage.init).not.toHaveBeenCalled();
+    expect(AlertsPage.injectTab).not.toHaveBeenCalled();
   });
 
-  test('does nothing for /account/alerts/sub-path', () => {
+  test('does nothing for /account with no sub-path', () => {
     delete window.location;
-    window.location = { pathname: '/account/settings' };
+    window.location = { pathname: '/account' };
     requireInit();
-    expect(MarketPage.init).not.toHaveBeenCalled();
+    expect(AlertsPage.injectTab).not.toHaveBeenCalled();
     expect(AlertsPage.init).not.toHaveBeenCalled();
   });
 });
@@ -94,14 +113,28 @@ describe('route — exported function direct calls', () => {
     expect(MarketPage.init).toHaveBeenCalledTimes(1);
   });
 
-  test('route() to /account/alerts calls AlertsPage.init()', () => {
+  test('route() to /account/bulk-alerts calls injectTab and init', () => {
     delete window.location;
     window.location = { pathname: '/' };
     const Init = requireInit();
 
     AlertsPage.init.mockReset();
-    Init.route('/account/alerts');
+    AlertsPage.injectTab.mockReset();
+    Init.route('/account/bulk-alerts');
+    expect(AlertsPage.injectTab).toHaveBeenCalledTimes(1);
     expect(AlertsPage.init).toHaveBeenCalledTimes(1);
+  });
+
+  test('route() to /account/alerts calls injectTab only', () => {
+    delete window.location;
+    window.location = { pathname: '/' };
+    const Init = requireInit();
+
+    AlertsPage.init.mockReset();
+    AlertsPage.injectTab.mockReset();
+    Init.route('/account/alerts');
+    expect(AlertsPage.injectTab).toHaveBeenCalledTimes(1);
+    expect(AlertsPage.init).not.toHaveBeenCalled();
   });
 });
 
