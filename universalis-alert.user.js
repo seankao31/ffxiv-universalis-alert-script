@@ -311,6 +311,14 @@ if (typeof module !== 'undefined') module.exports = SaveOps;
 const Modal = (() => {
   const _WorldMap = typeof WorldMap !== 'undefined' ? WorldMap : require('./worldmap');
 
+  const _apiModule = typeof module !== 'undefined' ? require('./api') : null;
+  const _groupingModule = typeof module !== 'undefined' ? require('./grouping') : null;
+  const _saveOpsModule = typeof module !== 'undefined' ? require('./save-ops') : null;
+
+  function _API() { return typeof API !== 'undefined' ? API : _apiModule; }
+  function _Grouping() { return typeof Grouping !== 'undefined' ? Grouping : _groupingModule; }
+  function _SaveOps() { return typeof SaveOps !== 'undefined' ? SaveOps : _saveOpsModule; }
+
   const METRIC_LABELS = { pricePerUnit: 'Price Per Unit', quantity: 'Quantity', total: 'Total' };
   const MAPPER_VALUES = ['pricePerUnit', 'quantity', 'total'];
   const REDUCER_VALUES = ['min', 'max', 'mean'];
@@ -330,7 +338,16 @@ const Modal = (() => {
     };
   }
 
-  function openModal({ itemId, itemName, group, onSave, multipleGroups = false }) {
+  function formatRule(trigger) {
+    const comparator = 'lt' in trigger.comparison ? '<' : '>';
+    const target = trigger.comparison[Object.keys(trigger.comparison)[0]].target;
+    const metricLabels = { pricePerUnit: 'Min price', quantity: 'Quantity', total: 'Total' };
+    const reducerLabels = { min: 'Min', max: 'Max', mean: 'Avg' };
+    const label = `${reducerLabels[trigger.reducer] || trigger.reducer} ${metricLabels[trigger.mapper] || trigger.mapper} ${comparator} ${target}`;
+    return trigger.filters.includes('hq') ? `${label} <span style="background:#4a8a4a;border-radius:3px;padding:0 4px;font-size:11px">HQ</span>` : label;
+  }
+
+  function renderFormView(container, { itemId, itemName, group, onSave, onBack, multipleGroups }) {
     const existingWorldIds = new Set((group?.worlds || []).map(w => w.worldId));
     const existingTrigger = group?.trigger || { filters: [], mapper: 'pricePerUnit', reducer: 'min', comparison: { lt: { target: 0 } } };
     const existingComparator = Object.keys(existingTrigger.comparison)[0]; // 'lt' or 'gt'
@@ -341,10 +358,6 @@ const Modal = (() => {
     const webhookFromAlert = group?.discordWebhook || '';
     const webhookFromGM = GM_getValue('discordWebhook') || '';
     const initialWebhook = webhookFromAlert || webhookFromGM;
-
-    const overlay = document.createElement('div');
-    overlay.id = 'univ-alert-modal';
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:9999';
 
     const isNewAlert = !group;
     const worldCheckboxes = _WorldMap.WORLDS.map(w => {
@@ -361,9 +374,13 @@ const Modal = (() => {
            Multiple alert rules exist for this item. Editing here will only affect this rule. Use the <a href="/account/alerts" style="color:#ff9800">Alerts page</a> to manage all rules.
          </div>` : '';
 
-    overlay.innerHTML = `
-      <div style="background:#1a1a2e;border-radius:8px;padding:24px;width:480px;max-height:80vh;overflow-y:auto;color:#fff">
-        <h3 style="margin:0 0 16px">Set Alerts — ${itemName}</h3>
+    const backLink = onBack
+      ? `<a href="#" data-action="back" style="color:#aaa;font-size:13px;text-decoration:none;display:inline-block;margin-bottom:12px">\u2190 Back to alerts</a>`
+      : '';
+
+    container.innerHTML = `
+        ${backLink}
+        <h3 style="margin:0 0 16px">Set Alerts \u2014 ${itemName}</h3>
         ${multiNotice}
         <form id="univ-alert-form">
           <div style="margin-bottom:12px">
@@ -409,29 +426,33 @@ const Modal = (() => {
             <button type="button" data-action="cancel" style="background:#2a2a4e;border:1px solid #444;color:#fff;padding:8px 16px;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center">Cancel</button>
             <button type="button" data-action="save" style="background:#1a5a8a;border:none;color:#fff;padding:8px 16px;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center" ${initialWebhook ? '' : 'disabled'}>Save</button>
           </div>
-        </form>
-      </div>`;
+        </form>`;
 
-    document.body.appendChild(overlay);
-
-    const form = overlay.querySelector('#univ-alert-form');
-    const webhookInput = overlay.querySelector('[data-field="webhook"]');
-    const saveBtn = overlay.querySelector('[data-action="save"]');
-    const errorArea = overlay.querySelector('[data-error-area]');
-    const statusEl = overlay.querySelector('[data-status]');
+    const form = container.querySelector('#univ-alert-form');
+    const webhookInput = container.querySelector('[data-field="webhook"]');
+    const saveBtn = container.querySelector('[data-action="save"]');
+    const errorArea = container.querySelector('[data-error-area]');
+    const statusEl = container.querySelector('[data-status]');
 
     // Enable/disable Save based on webhook
     webhookInput.addEventListener('input', () => {
       saveBtn.disabled = !webhookInput.value.trim();
     });
 
-    overlay.querySelector('[data-action="select-all"]').addEventListener('click', () => {
-      overlay.querySelectorAll('input[data-world-id]').forEach(cb => { cb.checked = true; });
+    container.querySelector('[data-action="select-all"]').addEventListener('click', () => {
+      container.querySelectorAll('input[data-world-id]').forEach(cb => { cb.checked = true; });
     });
-    overlay.querySelector('[data-action="clear-all"]').addEventListener('click', () => {
-      overlay.querySelectorAll('input[data-world-id]').forEach(cb => { cb.checked = false; });
+    container.querySelector('[data-action="clear-all"]').addEventListener('click', () => {
+      container.querySelectorAll('input[data-world-id]').forEach(cb => { cb.checked = false; });
     });
-    overlay.querySelector('[data-action="cancel"]').addEventListener('click', closeModal);
+    container.querySelector('[data-action="cancel"]').addEventListener('click', closeModal);
+
+    if (onBack) {
+      container.querySelector('[data-action="back"]').addEventListener('click', (e) => {
+        e.preventDefault();
+        onBack();
+      });
+    }
 
     saveBtn.addEventListener('click', async () => {
       saveBtn.disabled = true;
@@ -441,7 +462,7 @@ const Modal = (() => {
 
       const webhook = webhookInput.value.trim();
       const selectedWorldIds = new Set(
-        [...overlay.querySelectorAll('input[data-world-id]:checked')].map(cb => Number(cb.dataset.worldId))
+        [...container.querySelectorAll('input[data-world-id]:checked')].map(cb => Number(cb.dataset.worldId))
       );
       const trigger = buildTriggerFromForm(form);
       const name = form.querySelector('[data-field="name"]').value.trim();
@@ -461,7 +482,6 @@ const Modal = (() => {
 
       try {
         await onSave({ name, webhook, trigger, selectedWorldIds }, onProgress);
-        closeModal();
       } catch (err) {
         statusEl.style.display = 'none';
         errorArea.textContent = err.message;
@@ -472,12 +492,211 @@ const Modal = (() => {
     });
   }
 
-  function closeModal() {
-    const existing = document.getElementById('univ-alert-modal');
-    if (existing) existing.remove();
+  function renderListView(container, { itemId, itemName, groups, onEdit, onDelete, onNew, onClose }) {
+    const rows = groups.map((g, idx) => {
+      const worldPills = g.worlds.map(w =>
+        `<span data-world-pill style="background:#1a3a5c;border-radius:12px;padding:2px 8px;font-size:12px;margin:2px;display:inline-block">${w.worldName || w.worldId}</span>`
+      ).join('');
+      return `
+        <div data-group-row="${idx}" style="background:#2a2a4a;padding:10px;border-radius:4px;margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start">
+            <div>
+              <div style="font-size:13px;color:#ccc">${formatRule(g.trigger)}</div>
+              <div data-world-pills style="margin-top:6px">${worldPills}</div>
+            </div>
+            <div style="display:flex;gap:6px;flex-shrink:0">
+              <button data-action="edit" data-group-idx="${idx}" style="background:#1a4a7a;border:none;color:#fff;padding:4px 10px;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center">Edit</button>
+              <button data-action="delete" data-group-idx="${idx}" style="background:#6a1a1a;border:none;color:#fff;padding:4px 10px;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center">Delete</button>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+
+    container.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <h3 style="margin:0;color:#fff">Bulk Alerts \u2014 ${itemName}</h3>
+        <span data-action="close" style="cursor:pointer;color:#888;font-size:18px">\u2715</span>
+      </div>
+      <div data-list-area style="max-height:300px;overflow-y:auto">${rows}</div>
+      <div style="border-top:1px solid #333;margin-top:12px;padding-top:12px;text-align:center">
+        <button data-action="new-alert" style="background:#1a5a2a;border:none;color:#fff;padding:8px 20px;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center">New Alert</button>
+      </div>`;
+
+    // Event delegation
+    container.addEventListener('click', (e) => {
+      const action = e.target.dataset.action;
+      if (action === 'close') { onClose(); return; }
+      if (action === 'new-alert') { onNew(); return; }
+      const idx = Number(e.target.dataset.groupIdx);
+      const group = groups[idx];
+      if (!group) return;
+      if (action === 'edit') onEdit(group);
+      if (action === 'delete') onDelete(group, idx, e.target);
+    });
   }
 
-  return { openModal, closeModal };
+  function openBulkModal({ itemId, itemName, groups }) {
+    closeModal(); // remove any existing modal
+
+    const overlay = document.createElement('div');
+    overlay.id = 'univ-alert-modal';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:9999';
+
+    const innerContainer = document.createElement('div');
+    innerContainer.style.cssText = 'background:#1a1a2e;border-radius:8px;padding:24px;width:480px;max-height:80vh;overflow-y:auto;color:#fff';
+    overlay.appendChild(innerContainer);
+    document.body.appendChild(overlay);
+
+    // Escape key dismiss
+    const onKeydown = (e) => { if (e.key === 'Escape') closeModal(); };
+    document.addEventListener('keydown', onKeydown);
+    overlay._onKeydown = onKeydown;
+
+    // Overlay click dismiss
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+
+    // --- Navigation functions ---
+
+    function showListView(currentGroups) {
+      innerContainer.innerHTML = '';
+      renderListView(innerContainer, {
+        itemId, itemName, groups: currentGroups,
+        onEdit: (group) => showFormView(group, currentGroups),
+        onDelete: (group, idx, btn) => {
+          handleListDelete(group, idx, btn, innerContainer, () => {
+            // All groups deleted — show blank form with no back button
+            showFormView(null, null);
+          });
+        },
+        onNew: () => showFormView(null, currentGroups),
+        onClose: () => closeModal(),
+      });
+    }
+
+    function showFormView(group, currentGroupsForBack) {
+      innerContainer.innerHTML = '';
+      const onBack = currentGroupsForBack ? () => showListView(currentGroupsForBack) : null;
+
+      const onSave = async (formState, onProgress) => {
+        onProgress?.({ phase: 'refreshing' });
+        const freshAlerts = await _API().getAlerts();
+        const freshItemAlerts = freshAlerts.filter(a => a.itemId === itemId);
+        const freshGroups = _Grouping().groupAlerts(freshItemAlerts);
+        freshGroups.forEach(g => {
+          g.worlds = g.worlds.map(w => ({ ...w, worldName: _WorldMap.worldById(w.worldId)?.worldName || '' }));
+        });
+
+        // Find matching group by trigger key (if editing)
+        const normalizeTrigger = _Grouping().normalizeTrigger;
+        const originalTriggerKey = group ? normalizeTrigger(group.trigger) : null;
+        const freshGroup = originalTriggerKey
+          ? freshGroups.find(g => normalizeTrigger(g.trigger) === originalTriggerKey) || null
+          : null;
+
+        const ops = _SaveOps().computeSaveOps(freshGroup, formState, _WorldMap.WORLDS);
+        await _SaveOps().executeSaveOps(ops, itemId, formState, { onProgress });
+
+        // After save: re-fetch and return to list view
+        const updatedAlerts = await _API().getAlerts();
+        const updatedItemAlerts = updatedAlerts.filter(a => a.itemId === itemId);
+        const updatedGroups = _Grouping().groupAlerts(updatedItemAlerts);
+        updatedGroups.forEach(g => {
+          g.worlds = g.worlds.map(w => ({ ...w, worldName: _WorldMap.worldById(w.worldId)?.worldName || '' }));
+        });
+        showListView(updatedGroups);
+      };
+
+      renderFormView(innerContainer, { itemId, itemName, group, onSave, onBack, multipleGroups: false });
+    }
+
+    // --- Initial routing ---
+    if (groups.length === 0) {
+      showFormView(null, null);
+    } else {
+      showListView(groups);
+    }
+  }
+
+  function openModal({ itemId, itemName, group, onSave, multipleGroups = false }) {
+    const overlay = document.createElement('div');
+    overlay.id = 'univ-alert-modal';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:9999';
+
+    const innerContainer = document.createElement('div');
+    innerContainer.style.cssText = 'background:#1a1a2e;border-radius:8px;padding:24px;width:480px;max-height:80vh;overflow-y:auto;color:#fff';
+    overlay.appendChild(innerContainer);
+
+    document.body.appendChild(overlay);
+
+    // Dismiss on Escape
+    const onKeydown = (e) => {
+      if (e.key === 'Escape') closeModal();
+    };
+    document.addEventListener('keydown', onKeydown);
+    overlay._onKeydown = onKeydown; // store for cleanup
+
+    // Dismiss on overlay background click
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) closeModal();
+    });
+
+    const wrappedOnSave = async (formState, onProgress) => {
+      await onSave(formState, onProgress);
+      closeModal();
+    };
+
+    renderFormView(innerContainer, { itemId, itemName, group, onSave: wrappedOnSave, onBack: null, multipleGroups });
+  }
+
+  function closeModal() {
+    const existing = document.getElementById('univ-alert-modal');
+    if (existing) {
+      if (existing._onKeydown) {
+        document.removeEventListener('keydown', existing._onKeydown);
+      }
+      existing.remove();
+    }
+  }
+
+  async function handleListDelete(group, idx, btn, container, onAllDeleted) {
+    btn.disabled = true;
+    const total = group.worlds.length;
+    let completed = 0;
+
+    const results = await Promise.allSettled(group.worlds.map(async (w) => {
+      try {
+        return await _API().deleteAlert(w.alertId);
+      } finally {
+        completed++;
+        btn.textContent = `Deleting ${completed}/${total}...`;
+      }
+    }));
+
+    const failures = results
+      .map((r, i) => r.status === 'rejected' ? group.worlds[i] : null)
+      .filter(Boolean);
+
+    if (failures.length === 0) {
+      const row = container.querySelector(`[data-group-row="${idx}"]`);
+      if (row) row.remove();
+      // Check if all groups deleted
+      if (!container.querySelector('[data-group-row]')) {
+        onAllDeleted();
+      }
+    } else {
+      group.worlds = failures;
+      btn.textContent = `Retry (${failures.length} remaining)`;
+      btn.disabled = false;
+      // Update world pills
+      const row = container.querySelector(`[data-group-row="${idx}"]`);
+      const pillsContainer = row.querySelector('[data-world-pills]');
+      pillsContainer.innerHTML = failures
+        .map(w => `<span data-world-pill style="background:#1a3a5c;border-radius:12px;padding:2px 8px;font-size:12px;margin:2px;display:inline-block">${w.worldName || w.worldId}</span>`)
+        .join('');
+    }
+  }
+
+  return { openModal, closeModal, formatRule, renderListView, handleListDelete, openBulkModal };
 })();
 
 if (typeof module !== 'undefined') module.exports = Modal;
@@ -488,13 +707,11 @@ const MarketPage = (() => {
   const _apiModule = typeof module !== 'undefined' ? require('./api') : null;
   const _modalModule = typeof module !== 'undefined' ? require('./modal') : null;
   const _groupingModule = typeof module !== 'undefined' ? require('./grouping') : null;
-  const _saveOpsModule = typeof module !== 'undefined' ? require('./save-ops') : null;
   const _worldMapModule = typeof module !== 'undefined' ? require('./worldmap') : null;
 
   function _API() { return typeof API !== 'undefined' ? API : _apiModule; }
   function _Modal() { return typeof Modal !== 'undefined' ? Modal : _modalModule; }
   function _Grouping() { return typeof Grouping !== 'undefined' ? Grouping : _groupingModule; }
-  function _SaveOps() { return typeof SaveOps !== 'undefined' ? SaveOps : _saveOpsModule; }
   function _WorldMap() { return typeof WorldMap !== 'undefined' ? WorldMap : _worldMapModule; }
 
   function findButtonBar() {
@@ -511,7 +728,7 @@ const MarketPage = (() => {
 
     const btn = document.createElement('button');
     btn.id = 'univ-alert-btn';
-    btn.textContent = '🔔 Set Alerts';
+    btn.textContent = '🔔 Bulk Alerts';
     btn.style.cssText = 'background:#1a5a8a;border:none;color:#fff;padding:8px 16px;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;margin-left:8px';
 
     btn.addEventListener('click', () => handleAlertButtonClick(itemId, readItemName()));
@@ -541,37 +758,11 @@ const MarketPage = (() => {
 
     const itemAlerts = allAlerts.filter(a => a.itemId === itemId);
     const groups = _Grouping().groupAlerts(itemAlerts);
-
-    // Enrich worlds with worldName
     groups.forEach(g => {
       g.worlds = g.worlds.map(w => ({ ...w, worldName: _WorldMap().worldById(w.worldId)?.worldName || '' }));
     });
 
-    const group = groups[0] || null;
-    const multipleGroups = groups.length > 1;
-
-    _Modal().openModal({
-      itemId,
-      itemName,
-      group,
-      multipleGroups,
-      onSave: async (formState, onProgress) => {
-        onProgress?.({ phase: 'refreshing' });
-        const freshAlerts = await _API().getAlerts();
-        const freshItemAlerts = freshAlerts.filter(a => a.itemId === itemId);
-        const freshGroups = _Grouping().groupAlerts(freshItemAlerts);
-        freshGroups.forEach(g => {
-          g.worlds = g.worlds.map(w => ({ ...w, worldName: _WorldMap().worldById(w.worldId)?.worldName || '' }));
-        });
-        const { normalizeTrigger } = _Grouping();
-        const originalTriggerKey = group ? normalizeTrigger(group.trigger) : null;
-        const freshGroup = originalTriggerKey
-          ? freshGroups.find(g => normalizeTrigger(g.trigger) === originalTriggerKey) || null
-          : null;
-        const ops = _SaveOps().computeSaveOps(freshGroup, formState, _WorldMap().WORLDS);
-        await _SaveOps().executeSaveOps(ops, itemId, formState, { onProgress });
-      },
-    });
+    _Modal().openBulkModal({ itemId, itemName, groups });
   }
 
   function init() {
