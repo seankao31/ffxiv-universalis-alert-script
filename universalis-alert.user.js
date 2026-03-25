@@ -318,6 +318,10 @@ const Modal = (() => {
   function _Grouping() { return typeof Grouping !== 'undefined' ? Grouping : _groupingModule; }
   function _SaveOps() { return typeof SaveOps !== 'undefined' ? SaveOps : _saveOpsModule; }
 
+  function escHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
   const METRIC_LABELS = { pricePerUnit: 'Price Per Unit', quantity: 'Quantity', total: 'Total' };
   const MAPPER_VALUES = ['pricePerUnit', 'quantity', 'total'];
   const REDUCER_VALUES = ['min', 'max', 'mean'];
@@ -374,7 +378,7 @@ const Modal = (() => {
 
     container.innerHTML = `
         ${backLink}
-        <h3 style="margin:0 0 16px">Set Alerts \u2014 ${itemName}</h3>
+        <h3 style="margin:0 0 16px">Set Alerts \u2014 ${escHtml(itemName)}</h3>
         <form id="univ-alert-form">
           <div style="margin-bottom:12px">
             <label style="display:block;margin-bottom:4px;font-size:13px">Alert Name</label>
@@ -496,7 +500,7 @@ const Modal = (() => {
         <div data-group-row="${idx}" style="background:#2a2a4a;padding:10px;border-radius:4px;margin-bottom:8px">
           <div style="display:flex;justify-content:space-between;align-items:flex-start">
             <div>
-              <div style="font-size:14px;color:#fff">${itemName} <span style="font-size:11px;color:#888">#${g.itemId}</span></div>
+              <div style="font-size:14px;color:#fff">${escHtml(itemName)} <span style="font-size:11px;color:#888">#${g.itemId}</span></div>
               <div style="font-size:13px;color:#ccc;margin-top:4px">${formatRule(g.trigger)}</div>
               <div data-world-pills style="margin-top:6px">${worldPills}</div>
             </div>
@@ -705,6 +709,8 @@ const HeaderButton = (() => {
   function _Grouping() { return typeof Grouping !== 'undefined' ? Grouping : _groupingModule; }
   function _WorldMap() { return typeof WorldMap !== 'undefined' ? WorldMap : _worldMapModule; }
 
+  let _initObserver = null;
+
   function findAccountSection() {
     const accountLink = document.querySelector('header a[href="/account"]');
     if (!accountLink) return null;
@@ -802,13 +808,15 @@ const HeaderButton = (() => {
       injectButton();
       return;
     }
-    const observer = new MutationObserver(() => {
+    if (_initObserver) return; // already watching
+    _initObserver = new MutationObserver(() => {
       if (findAccountSection()) {
-        observer.disconnect();
+        _initObserver.disconnect();
+        _initObserver = null;
         injectButton();
       }
     });
-    observer.observe(document.body, { childList: true, subtree: true });
+    _initObserver.observe(document.body, { childList: true, subtree: true });
   }
 
   return { init, injectButton, handleClick };
