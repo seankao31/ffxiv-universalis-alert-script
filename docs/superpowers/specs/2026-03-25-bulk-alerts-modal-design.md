@@ -87,12 +87,13 @@ Market page button text changes from "🔔 Set Alerts" to "🔔 Bulk Alerts".
   - Button label: "Set Alerts" → "Bulk Alerts"
   - `handleAlertButtonClick`: simplified — fetches alerts, filters for item, groups them, and calls `openBulkModal` passing itemId, itemName, and groups. Error handling for failed fetch stays in the caller (modal does not open on error).
 
-- **`src/modal.js`**
-  - New function: `openBulkModal({ itemId, itemName, groups })` — creates modal overlay/container, renders List View or Form View based on whether groups is non-empty
+- **`src/modal.js`** — refactored using the "extract shared form" approach:
+  - New internal function: `renderFormView(container, { itemId, itemName, group, onSave, onBack })` — extracted from current `openModal` internals. Contains all form rendering, event binding, and save/progress handling. When `onBack` is provided, shows a "← Back to alerts" link at the top.
+  - `openModal` refactored: creates overlay, then delegates to `renderFormView` with `onBack: null`. Behavior is identical to today — alerts-page.js callers see no change. The `multipleGroups` parameter remains for alerts-page compatibility (alerts-page always passes `multipleGroups: false`).
   - New internal function: `renderListView(container, itemId, itemName, groups)` — renders alert group rows with Edit/Delete, "New Alert" button
-  - New internal function: `renderFormView(container, { itemId, itemName, group, onSave, onBack })` — renders the form (refactored from current `openModal` internals)
-  - Existing `openModal` preserved for alerts-page.js backward compatibility. The `multipleGroups` parameter in `openModal` becomes unused by the market page flow but remains for alerts-page compatibility (alerts-page always passes `multipleGroups: false`).
-  - New export: `openBulkModal`
+  - New function: `openBulkModal({ itemId, itemName, groups })` — creates modal overlay, renders List View or delegates to `renderFormView` based on whether groups is non-empty
+  - Overlay dismiss: both `openModal` and `openBulkModal` close on Escape key and overlay background click (via shared event listeners on the overlay element)
+  - New export: `openBulkModal` (added to return object alongside `openModal`, `closeModal`)
 
 ### Unchanged
 
