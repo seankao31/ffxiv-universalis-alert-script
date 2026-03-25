@@ -804,17 +804,10 @@ const HeaderButton = (() => {
   }
 
   function init() {
-    if (findAccountSection()) {
-      injectButton();
-      return;
-    }
+    injectButton();
     if (_initObserver) return; // already watching
     _initObserver = new MutationObserver(() => {
-      if (findAccountSection()) {
-        _initObserver.disconnect();
-        _initObserver = null;
-        injectButton();
-      }
+      try { injectButton(); } catch (_) { /* DOM torn down */ }
     });
     _initObserver.observe(document.body, { childList: true, subtree: true });
   }

@@ -162,7 +162,7 @@ describe('init', () => {
     expect(document.getElementById('univ-alert-btn')).not.toBeNull();
   });
 
-  test('does not create duplicate observers when called multiple times with no header', async () => {
+  test('does not create duplicate observers when called multiple times', async () => {
     document.body.innerHTML = '';
     HeaderButton.init();
     HeaderButton.init();
@@ -176,5 +176,21 @@ describe('init', () => {
 
     // Should only have one button (no duplicates from multiple observers)
     expect(document.querySelectorAll('#univ-alert-btn')).toHaveLength(1);
+  });
+
+  test('re-injects button after React re-render wipes it', async () => {
+    setupHeader();
+    HeaderButton.init();
+    expect(document.getElementById('univ-alert-btn')).not.toBeNull();
+
+    // Simulate React re-render wiping the button
+    document.getElementById('univ-alert-btn').remove();
+    expect(document.getElementById('univ-alert-btn')).toBeNull();
+
+    // Trigger a DOM mutation so the observer fires
+    document.body.appendChild(document.createElement('span'));
+    await new Promise(r => setTimeout(r, 0));
+
+    expect(document.getElementById('univ-alert-btn')).not.toBeNull();
   });
 });
