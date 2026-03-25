@@ -11,17 +11,21 @@ Add a "Bulk Alerts" tab to the universalis.app account page navigation (alongsid
 - `Init.route()` maps `/account/alerts` → `AlertsPage.init()`
 - Header `@match` targets `https://universalis.app/account/alerts`
 
-## Assumed DOM Structure
+## Actual DOM Structure
 
-The universalis.app account page renders:
+The universalis.app account page renders (verified 2026-03-25):
 ```
 <main>
-  <div><!-- nav button list: account, characters, lists, alerts --></div>
-  <div><!-- content area for the active tab --></div>
+  <div class="account">
+    <div><!-- nav link list: account, characters, lists, alerts, logout --></div>
+    <div><!-- content area for the active tab --></div>
+  </div>
 </main>
 ```
 
-`/account/bulk-alerts` is a synthetic route — universalis.app will render the account page shell (with `<main>` and the nav div) since it matches `/account/*`. The content div may show a fallback or empty state from the site's own router, which we replace entirely.
+There is a wrapper `<div class="account">` between `<main>` and the nav/content divs. All selectors must traverse this wrapper: `main > div > div:first-child` for nav, `main > div > div:nth-child(2)` for content.
+
+`/account/bulk-alerts` is a synthetic route — universalis.app will render the account page shell (with `<main>` and the wrapper div) since it matches `/account/*`. The content div may show a fallback or empty state from the site's own router, which we replace entirely.
 
 ## New Behavior
 
