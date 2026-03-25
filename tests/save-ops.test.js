@@ -63,6 +63,32 @@ describe('computeSaveOps', () => {
       expect.objectContaining({ alertId: 'alert-4030', worldId: 4030, worldName: '利維坦' })
     );
   });
+
+  test('returns netChange = postsNeeded.length - deletesAfterSuccess.length', () => {
+    const ops = computeSaveOps(null, formState([4028, 4029]), WORLDS, 0);
+    expect(ops.netChange).toBe(2);
+  });
+
+  test('returns capacityError null when new alerts fit within limit', () => {
+    const ops = computeSaveOps(null, formState([4028, 4029]), WORLDS, 38);
+    expect(ops.capacityError).toBeNull();
+  });
+
+  test('returns capacityError when new alerts would exceed MAX_ALERTS', () => {
+    const ops = computeSaveOps(null, formState([4028, 4029, 4030]), WORLDS, 38);
+    expect(ops.capacityError).toBe('Not enough alert slots (need 3, only 2 available)');
+  });
+
+  test('returns capacityError at exactly MAX_ALERTS with posts needed', () => {
+    const ops = computeSaveOps(null, formState([4028]), WORLDS, 40);
+    expect(ops.capacityError).toBe('Not enough alert slots (need 1, only 0 available)');
+  });
+
+  test('no capacityError when no posts are needed', () => {
+    // All worlds unchecked → nothing to post
+    const ops = computeSaveOps(null, formState([]), WORLDS, 40);
+    expect(ops.capacityError).toBeNull();
+  });
 });
 
 // --- executeSaveOps ---

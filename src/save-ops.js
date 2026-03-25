@@ -4,13 +4,16 @@ const SaveOps = (() => {
   const _Grouping = typeof Grouping !== 'undefined' ? Grouping : require('./grouping');
   const _API = typeof API !== 'undefined' ? API : require('./api');
 
+  const MAX_ALERTS = 40;
+
   /**
-   * Pure function. Returns { postsNeeded, deletesAfterSuccess }.
+   * Pure function. Returns { postsNeeded, deletesAfterSuccess, netChange, capacityError }.
    * @param {object|null} group  - existing logical alert group, or null
    * @param {object} formState   - { name, webhook, trigger, selectedWorldIds: Set<number> }
    * @param {Array}  worlds      - full world list (WORLDS)
+   * @param {number} [currentAlertCount] - current total alert count for capacity check
    */
-  function computeSaveOps(group, formState, worlds) {
+  function computeSaveOps(group, formState, worlds, currentAlertCount) {
     const postsNeeded = [];
     const deletesAfterSuccess = [];
 
@@ -46,7 +49,14 @@ const SaveOps = (() => {
       }
     }
 
-    return { postsNeeded, deletesAfterSuccess };
+    const netChange = postsNeeded.length - deletesAfterSuccess.length;
+    const available = MAX_ALERTS - (currentAlertCount || 0);
+    let capacityError = null;
+    if (postsNeeded.length > 0 && (currentAlertCount || 0) + netChange > MAX_ALERTS) {
+      capacityError = `Not enough alert slots (need ${postsNeeded.length}, only ${available + deletesAfterSuccess.length} available)`;
+    }
+
+    return { postsNeeded, deletesAfterSuccess, netChange, capacityError };
   }
 
   /**
@@ -112,7 +122,7 @@ const SaveOps = (() => {
     }
   }
 
-  return { computeSaveOps, executeSaveOps };
+  return { computeSaveOps, executeSaveOps, MAX_ALERTS };
 })();
 
 if (typeof module !== 'undefined') module.exports = SaveOps;
