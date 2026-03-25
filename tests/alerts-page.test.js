@@ -262,6 +262,40 @@ describe('init — stale panel cleanup and native content hiding', () => {
   });
 });
 
+describe('fetchItemNames', () => {
+  test('parses item names from fetched /account/alerts HTML', async () => {
+    fetch.mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve('<html><body><a href="/market/44015">木棉原木</a><a href="/market/99">Other</a></body></html>'),
+    });
+    const map = await AlertsPage.fetchItemNames();
+    expect(map.get(44015)).toBe('木棉原木');
+    expect(map.get(99)).toBe('Other');
+    expect(fetch).toHaveBeenCalledWith('/account/alerts');
+  });
+
+  test('returns empty Map when fetch fails', async () => {
+    fetch.mockRejectedValue(new Error('Network error'));
+    const map = await AlertsPage.fetchItemNames();
+    expect(map.size).toBe(0);
+  });
+
+  test('returns empty Map when response has no market links', async () => {
+    fetch.mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve('<html><body><p>No alerts</p></body></html>'),
+    });
+    const map = await AlertsPage.fetchItemNames();
+    expect(map.size).toBe(0);
+  });
+
+  test('returns empty Map when response is not ok', async () => {
+    fetch.mockResolvedValue({ ok: false, status: 403 });
+    const map = await AlertsPage.fetchItemNames();
+    expect(map.size).toBe(0);
+  });
+});
+
 describe('delete button — retry on partial failure', () => {
   const trigger = { filters: [], mapper: 'pricePerUnit', reducer: 'min', comparison: { lt: { target: 130 } } };
   const alert1 = { id: 'a1', itemId: 44015, worldId: 4030, name: 'My Alert', discordWebhook: 'https://wh.com',

@@ -21,6 +21,24 @@ const AlertsPage = (() => {
     return map;
   }
 
+  async function fetchItemNames() {
+    try {
+      const res = await fetch('/account/alerts');
+      if (!res.ok) return new Map();
+      const html = await res.text();
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      const map = new Map();
+      doc.querySelectorAll('a[href^="/market/"]').forEach(a => {
+        const parts = a.getAttribute('href').split('/');
+        const itemId = Number(parts[2]);
+        if (!isNaN(itemId)) map.set(itemId, a.textContent.trim());
+      });
+      return map;
+    } catch {
+      return new Map();
+    }
+  }
+
   function formatRule(trigger) {
     const comparator = 'lt' in trigger.comparison ? '<' : '>';
     const target = trigger.comparison[Object.keys(trigger.comparison)[0]].target;
@@ -230,7 +248,7 @@ const AlertsPage = (() => {
     document.body.prepend(errorEl);
   }
 
-  return { init, scrapeItemNames, renderAlertsPanel, deleteGroup, handleInitError };
+  return { init, scrapeItemNames, fetchItemNames, renderAlertsPanel, deleteGroup, handleInitError };
 })();
 
 if (typeof module !== 'undefined') module.exports = AlertsPage;
