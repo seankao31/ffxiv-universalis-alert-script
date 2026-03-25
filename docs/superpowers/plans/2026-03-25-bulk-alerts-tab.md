@@ -614,26 +614,6 @@ describe('injectTab', () => {
     expect(window.history.pushState).toHaveBeenCalledWith({}, '', '/account/bulk-alerts');
   });
 
-  test('click triggers init — renders panel into content div', async () => {
-    setupAccountDOM();
-    window.history.pushState = jest.fn();
-    const alert1 = { id: 'a1', itemId: 44015, worldId: 4030, name: 'Alert', discordWebhook: 'https://wh.com',
-      triggerVersion: 0, trigger: { filters: [], mapper: 'pricePerUnit', reducer: 'min', comparison: { lt: { target: 130 } } } };
-    fetch.mockResolvedValue({
-      ok: true,
-      text: () => Promise.resolve('<html><body><a href="/market/44015">木棉原木</a></body></html>'),
-    });
-    API.getAlerts.mockResolvedValue([alert1]);
-
-    AlertsPage.injectTab();
-    const btn = document.querySelector('#univ-bulk-alerts-tab');
-    btn.click();
-    await new Promise(r => setTimeout(r, 0));
-
-    const contentDiv = document.querySelector('main > div:nth-child(2)');
-    expect(contentDiv.querySelector('#univ-alert-panel')).not.toBeNull();
-  });
-
   test('waits for <main> via MutationObserver when not yet in DOM', async () => {
     document.body.innerHTML = '<div>Loading...</div>';
     AlertsPage.injectTab();
@@ -701,7 +681,7 @@ Add `injectTab` to the return object:
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `npx jest --no-coverage tests/alerts-page.test.js -t "injectTab"`
-Expected: PASS (5 tests)
+Expected: PASS (4 tests)
 
 - [ ] **Step 5: Commit**
 
@@ -782,6 +762,26 @@ describe('init — renders into <main> content div', () => {
 
     const navDiv = document.querySelector('main > div:first-child');
     expect(navDiv.style.display).not.toBe('none');
+  });
+
+  test('injectTab click triggers init — renders panel into content div', async () => {
+    setupAccountDOM();
+    window.history.pushState = jest.fn();
+    const alert1 = { id: 'a1', itemId: 44015, worldId: 4030, name: 'Alert', discordWebhook: 'https://wh.com',
+      triggerVersion: 0, trigger: { filters: [], mapper: 'pricePerUnit', reducer: 'min', comparison: { lt: { target: 130 } } } };
+    fetch.mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve('<html><body><a href="/market/44015">木棉原木</a></body></html>'),
+    });
+    API.getAlerts.mockResolvedValue([alert1]);
+
+    AlertsPage.injectTab();
+    const btn = document.querySelector('#univ-bulk-alerts-tab');
+    btn.click();
+    await new Promise(r => setTimeout(r, 0));
+
+    const contentDiv = document.querySelector('main > div:nth-child(2)');
+    expect(contentDiv.querySelector('#univ-alert-panel')).not.toBeNull();
   });
 
   test('waits for <main> with 2 child divs via MutationObserver', async () => {
