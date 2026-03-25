@@ -29,7 +29,7 @@ The caller (`market-page.js`) fetches alerts and filters for the item before ope
 | Form View | Successful save | List View (re-fetched) |
 | List View | Delete last remaining group (fully successful) | Form View (blank, same defaults as "New Alert") |
 
-Note: Escape key and overlay-click-to-close are out of scope (matches current modal behavior).
+The modal can also be dismissed by pressing Escape or clicking the overlay background. This applies to both the existing `openModal` and the new `openBulkModal`.
 
 ## List View
 
