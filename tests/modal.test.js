@@ -21,10 +21,10 @@ describe('openBulkModal — DOM structure', () => {
     expect(document.querySelector('#univ-alert-modal')).not.toBeNull();
   });
 
-  test('renders checkboxes for all 8 陸行鳥 worlds', () => {
+  test('renders chips for all 8 陸行鳥 worlds', () => {
     Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, '木棉原木']]), currentItemId: 44015, currentItemName: '木棉原木', alertCount: 0 });
-    const checkboxes = document.querySelectorAll('#univ-alert-modal input[type="checkbox"][data-world-id]');
-    expect(checkboxes).toHaveLength(8);
+    const chips = document.querySelectorAll('#univ-alert-modal [data-world-id]');
+    expect(chips).toHaveLength(8);
   });
 
   test('Save button is disabled when webhook field is empty', () => {
@@ -75,14 +75,14 @@ describe('openBulkModal — pre-population from group', () => {
     worlds: [{ worldId: 4030, alertId: 'a1', worldName: '利維坦' }],
   };
 
-  test('pre-checks world checkboxes for worlds in existing group', () => {
+  test('pre-selects world chips for worlds in existing group', () => {
     Modal.openBulkModal({ groups: [group], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item', alertCount: 0 });
     const modal = document.querySelector('#univ-alert-modal');
     modal.querySelector('[data-action="edit"]').click();
-    const cb4030 = document.querySelector('#univ-alert-modal input[data-world-id="4030"]');
-    const cb4031 = document.querySelector('#univ-alert-modal input[data-world-id="4031"]');
-    expect(cb4030.checked).toBe(true);
-    expect(cb4031.checked).toBe(false);
+    const chip4030 = document.querySelector('#univ-alert-modal [data-world-id="4030"]');
+    const chip4031 = document.querySelector('#univ-alert-modal [data-world-id="4031"]');
+    expect(chip4030.dataset.selected).toBe('true');
+    expect(chip4031.dataset.selected).toBe('false');
   });
 
   test('pre-fills alert name with group name', () => {
@@ -517,27 +517,27 @@ describe('closeModal', () => {
 });
 
 describe('renderFormView — Select All / Clear All buttons', () => {
-  test('Select All checks all world checkboxes', () => {
+  test('Select All selects all world chips', () => {
     GM_getValue.mockReturnValue('https://wh.com');
     Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item', alertCount: 0 });
     // Clear all first so we can verify Select All works
     document.querySelector('#univ-alert-modal [data-action="clear-all"]').click();
-    const checkboxes = document.querySelectorAll('#univ-alert-modal input[data-world-id]');
-    checkboxes.forEach(cb => expect(cb.checked).toBe(false));
+    const chips = document.querySelectorAll('#univ-alert-modal [data-world-id]');
+    chips.forEach(chip => expect(chip.dataset.selected).toBe('false'));
 
     document.querySelector('#univ-alert-modal [data-action="select-all"]').click();
-    checkboxes.forEach(cb => expect(cb.checked).toBe(true));
+    chips.forEach(chip => expect(chip.dataset.selected).toBe('true'));
   });
 
-  test('Clear All unchecks all world checkboxes', () => {
+  test('Clear All deselects all world chips', () => {
     GM_getValue.mockReturnValue('https://wh.com');
     Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item', alertCount: 0 });
-    // All should be checked by default for new alerts
-    const checkboxes = document.querySelectorAll('#univ-alert-modal input[data-world-id]');
-    checkboxes.forEach(cb => expect(cb.checked).toBe(true));
+    // All should be selected by default for new alerts
+    const chips = document.querySelectorAll('#univ-alert-modal [data-world-id]');
+    chips.forEach(chip => expect(chip.dataset.selected).toBe('true'));
 
     document.querySelector('#univ-alert-modal [data-action="clear-all"]').click();
-    checkboxes.forEach(cb => expect(cb.checked).toBe(false));
+    chips.forEach(chip => expect(chip.dataset.selected).toBe('false'));
   });
 });
 
@@ -675,9 +675,9 @@ describe('renderFormView — Save builds trigger from form and saves webhook', (
     Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item', alertCount: 0 });
 
     document.querySelector('#univ-alert-modal [data-field="name"]').value = 'Custom Name';
-    // Clear all, then check just one world
+    // Clear all, then select just one world
     document.querySelector('#univ-alert-modal [data-action="clear-all"]').click();
-    document.querySelector('#univ-alert-modal input[data-world-id="4030"]').checked = true;
+    document.querySelector('#univ-alert-modal [data-world-id="4030"]').dataset.selected = 'true';
 
     document.querySelector('#univ-alert-modal [data-action="save"]').click();
     await new Promise(r => setTimeout(r, 10));

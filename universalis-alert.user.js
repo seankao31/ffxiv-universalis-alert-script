@@ -456,13 +456,11 @@ const Modal = (() => {
     const initialWebhook = webhookFromAlert || webhookFromGM;
 
     const isNewAlert = !group;
-    const worldCheckboxes = _WorldMap.WORLDS.map(w => {
-      const checked = isNewAlert || existingWorldIds.has(w.worldId);
-      return `
-      <label style="display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:4px;${checked ? 'background:#1a3a5c;' : ''}">
-        <input type="checkbox" data-world-id="${w.worldId}" ${checked ? 'checked' : ''}/>
-        ${w.worldName}
-      </label>`;
+    const CHIP_ON = 'background:#1a5a8a;border:1px solid #3a8abf;color:#fff';
+    const CHIP_OFF = 'background:#2a2a4e;border:1px solid #444;color:#888';
+    const worldChips = _WorldMap.WORLDS.map(w => {
+      const selected = isNewAlert || existingWorldIds.has(w.worldId);
+      return `<span data-world-id="${w.worldId}" data-selected="${selected}" style="padding:6px 12px;border-radius:16px;cursor:pointer;font-size:13px;user-select:none;transition:all .15s;display:inline-block;${selected ? CHIP_ON : CHIP_OFF}">${w.worldName}</span>`;
     }).join('');
 
     container.innerHTML = `
@@ -503,7 +501,7 @@ const Modal = (() => {
               <button type="button" data-action="select-all" style="background:#2a4a2a;border:1px solid #4a8a4a;color:#fff;padding:4px 10px;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center">Select All</button>
               <button type="button" data-action="clear-all" style="background:#4a2a2a;border:1px solid #8a4a4a;color:#fff;padding:4px 10px;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center">Clear</button>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">${worldCheckboxes}</div>
+            <div data-world-grid style="display:grid;grid-template-columns:1fr 1fr;gap:6px">${worldChips}</div>
           </div>
           <div data-error-area style="display:none;background:#4a1a1a;border:1px solid #c00;padding:8px;border-radius:4px;margin-bottom:12px;font-size:13px"></div>
           <div data-status style="display:none;color:#aaa;font-size:13px;margin-bottom:12px"></div>
@@ -524,11 +522,21 @@ const Modal = (() => {
       saveBtn.disabled = !webhookInput.value.trim();
     });
 
+    function toggleChip(chip, selected) {
+      chip.dataset.selected = String(selected);
+      chip.style.cssText = `padding:6px 12px;border-radius:16px;cursor:pointer;font-size:13px;user-select:none;transition:all .15s;display:inline-block;${selected ? CHIP_ON : CHIP_OFF}`;
+    }
+
+    container.querySelector('[data-world-grid]').addEventListener('click', (e) => {
+      const chip = e.target.closest('[data-world-id]');
+      if (!chip) return;
+      toggleChip(chip, chip.dataset.selected !== 'true');
+    });
     container.querySelector('[data-action="select-all"]').addEventListener('click', () => {
-      container.querySelectorAll('input[data-world-id]').forEach(cb => { cb.checked = true; });
+      container.querySelectorAll('[data-world-id]').forEach(chip => toggleChip(chip, true));
     });
     container.querySelector('[data-action="clear-all"]').addEventListener('click', () => {
-      container.querySelectorAll('input[data-world-id]').forEach(cb => { cb.checked = false; });
+      container.querySelectorAll('[data-world-id]').forEach(chip => toggleChip(chip, false));
     });
     container.querySelector('[data-action="cancel"]').addEventListener('click', onBack || closeModal);
 
@@ -540,7 +548,7 @@ const Modal = (() => {
 
       const webhook = webhookInput.value.trim();
       const selectedWorldIds = new Set(
-        [...container.querySelectorAll('input[data-world-id]:checked')].map(cb => Number(cb.dataset.worldId))
+        [...container.querySelectorAll('[data-world-id][data-selected="true"]')].map(el => Number(el.dataset.worldId))
       );
       const trigger = buildTriggerFromForm(form);
       const name = form.querySelector('[data-field="name"]').value.trim();
