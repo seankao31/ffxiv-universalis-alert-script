@@ -53,6 +53,8 @@ const SaveOps = (() => {
     const available = MAX_ALERTS - (currentAlertCount || 0);
     let capacityError = null;
     if (postsNeeded.length > 0 && (currentAlertCount || 0) + netChange > MAX_ALERTS) {
+      // available + deletesAfterSuccess.length: deletes free slots during interleaved execution,
+      // so effective capacity = unused slots + slots that will be reclaimed by deletes.
       capacityError = `Not enough alert slots (need ${postsNeeded.length}, only ${available + deletesAfterSuccess.length} available)`;
     }
 
@@ -72,7 +74,8 @@ const SaveOps = (() => {
    * @param {number}   [options.availableSlots] - how many new alerts can be created before hitting capacity
    */
   async function executeSaveOps(ops, itemId, formState, { onProgress, availableSlots } = {}) {
-    // Default to unlimited slots when not specified (backward compat)
+    // Default to postsNeeded.length (all fit in one batch) when availableSlots is not passed.
+    // This preserves pre-interleaving behavior for callers that don't track capacity.
     let slots = typeof availableSlots === 'number' ? availableSlots : ops.postsNeeded.length;
 
     const pendingPosts = ops.postsNeeded.map((world, i) => ({ world, index: i }));

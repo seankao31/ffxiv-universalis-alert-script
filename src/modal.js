@@ -174,6 +174,8 @@ const Modal = (() => {
         statusEl.style.display = 'none';
         errorArea.textContent = err.message;
         errorArea.style.display = 'block';
+        // Capacity errors (validation) → "Save" so user can adjust worlds.
+        // Execution errors (API failure) → "Retry" to re-attempt the same operation.
         saveBtn.textContent = err.isCapacityError ? 'Save' : 'Retry';
         saveBtn.disabled = false;
       }
