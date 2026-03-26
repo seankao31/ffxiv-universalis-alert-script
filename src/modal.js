@@ -326,6 +326,17 @@ const Modal = (() => {
         updatedGroups.forEach(g => {
           g.worlds = g.worlds.map(w => ({ ...w, worldName: _WorldMap.worldById(w.worldId)?.worldName || '' }));
         });
+
+        // Re-read <h1> for current page item — it may not have been rendered
+        // when handleClick first ran (SPA navigations render content async)
+        if (currentItemId && !nameMap.has(currentItemId)) {
+          const h1 = document.querySelector('h1');
+          if (h1) {
+            const name = h1.textContent.trim().replace(/^\d+\s+/, '');
+            if (name) nameMap.set(currentItemId, name);
+          }
+        }
+
         showListView(updatedGroups, updatedAlerts.length);
       };
 

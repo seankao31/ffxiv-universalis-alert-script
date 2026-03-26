@@ -715,6 +715,17 @@ const Modal = (() => {
         updatedGroups.forEach(g => {
           g.worlds = g.worlds.map(w => ({ ...w, worldName: _WorldMap.worldById(w.worldId)?.worldName || '' }));
         });
+
+        // Re-read <h1> for current page item — it may not have been rendered
+        // when handleClick first ran (SPA navigations render content async)
+        if (currentItemId && !nameMap.has(currentItemId)) {
+          const h1 = document.querySelector('h1');
+          if (h1) {
+            const name = h1.textContent.trim().replace(/^\d+\s+/, '');
+            if (name) nameMap.set(currentItemId, name);
+          }
+        }
+
         showListView(updatedGroups, updatedAlerts.length);
       };
 
@@ -908,15 +919,27 @@ const HeaderButton = (() => {
       return;
     }
 
+    const { currentItemId, currentItemName } = detectPageContext();
+
     const uniqueItemIds = [...new Set(allAlerts.map(a => a.itemId))];
     const nameMap = await fetchItemNames(uniqueItemIds);
+
+    // Seed the current page's item name so the list view can display it
+    // even before any alerts exist for this item (avoids "Item #..." fallback)
+    if (currentItemId && currentItemName && !nameMap.has(currentItemId)) {
+      const stripped = currentItemName.replace(/^\d+\s+/, '');
+      if (stripped) {
+        nameMap.set(currentItemId, stripped);
+        _nameCache.set(currentItemId, stripped);
+        _saveNameCache();
+      }
+    }
 
     const groups = _Grouping().groupAlerts(allAlerts);
     groups.forEach(g => {
       g.worlds = g.worlds.map(w => ({ ...w, worldName: _WorldMap().worldById(w.worldId)?.worldName || '' }));
     });
 
-    const { currentItemId, currentItemName } = detectPageContext();
     _Modal().openBulkModal({ groups, nameMap, currentItemId, currentItemName, alertCount: allAlerts.length });
   }
 

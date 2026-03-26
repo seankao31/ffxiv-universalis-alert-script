@@ -209,6 +209,40 @@ describe('openBulkModal — Retry on execution failure', () => {
   });
 });
 
+describe('openBulkModal — item name resolution after save', () => {
+  test('list view shows correct item name even when h1 was absent at open time', async () => {
+    // Simulate SPA: <h1> is NOT rendered yet when modal opens
+    // currentItemName is empty because detectPageContext found no <h1>
+    GM_getValue.mockReturnValue('https://wh.com');
+
+    const updatedAlert = {
+      id: 'a1', itemId: 99999, worldId: 4030, name: 'NewAlert',
+      discordWebhook: 'https://wh.com', triggerVersion: 0,
+      trigger: { filters: [], mapper: 'pricePerUnit', reducer: 'min', comparison: { lt: { target: 100 } } },
+    };
+    API.getAlerts.mockResolvedValue([updatedAlert]);
+    SaveOps.computeSaveOps.mockReturnValue({ postsNeeded: [], deletesAfterSuccess: [] });
+    SaveOps.executeSaveOps.mockResolvedValue();
+
+    // Open modal with empty currentItemName (h1 not rendered yet)
+    const emptyNameMap = new Map();
+    Modal.openBulkModal({ groups: [], nameMap: emptyNameMap, currentItemId: 99999, currentItemName: '', alertCount: 0 });
+
+    // SPA now renders the <h1> (happens while user fills the form)
+    document.body.insertAdjacentHTML('beforeend', '<h1>新アイテム</h1>');
+
+    // User clicks Save
+    const modal = document.querySelector('#univ-alert-modal');
+    modal.querySelector('[data-action="save"]').click();
+    await new Promise(r => setTimeout(r, 0));
+
+    // List view should show item name from the now-rendered <h1>, not "Item #99999"
+    const listText = modal.textContent;
+    expect(listText).toContain('新アイテム');
+    expect(listText).not.toContain('Item #99999');
+  });
+});
+
 describe('openBulkModal — delete last group', () => {
   test('transitions to form view when last group deleted and currentItemId set', async () => {
     API.deleteAlert.mockResolvedValue();

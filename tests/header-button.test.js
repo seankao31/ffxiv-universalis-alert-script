@@ -233,6 +233,39 @@ describe('handleClick', () => {
     expect(callArgs.alertCount).toBe(2);
   });
 
+  test('seeds current page item name into nameMap even when no alerts exist for it', async () => {
+    setupHeader();
+    delete window.location;
+    window.location = { pathname: '/market/99999' };
+    document.body.insertAdjacentHTML('beforeend', '<h1>新アイテム</h1>');
+
+    // User has alerts for item 44015, but NOT for 99999
+    API.getAlerts.mockResolvedValue([alert1]);
+    fetch.mockResolvedValue({ ok: true, text: () => Promise.resolve('<html><body><h1>653 木棉原木</h1></body></html>') });
+
+    await HeaderButton.handleClick();
+
+    const callArgs = Modal.openBulkModal.mock.calls[0][0];
+    // The current page item should be in nameMap so list view can display it
+    expect(callArgs.nameMap.get(99999)).toBe('新アイテム');
+  });
+
+  test('seeds current page item name into nameMap when user has zero alerts', async () => {
+    setupHeader();
+    delete window.location;
+    window.location = { pathname: '/market/99999' };
+    document.body.insertAdjacentHTML('beforeend', '<h1>新アイテム</h1>');
+
+    API.getAlerts.mockResolvedValue([]);
+
+    await HeaderButton.handleClick();
+
+    const callArgs = Modal.openBulkModal.mock.calls[0][0];
+    expect(callArgs.nameMap.get(99999)).toBe('新アイテム');
+    // No fetch needed — name comes from the page's own <h1>
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   test('enriches groups with worldName', async () => {
     setupHeader();
     delete window.location;
