@@ -40,6 +40,32 @@ describe('computeSaveOps', () => {
     expect(ops.deletesAfterSuccess.map(d => d.alertId)).not.toContain('alert-4030');
   });
 
+  test('checked world with identical existing alert → in skippedWorlds', () => {
+    const ops = computeSaveOps(existingGroup, formState([4030]), WORLDS);
+    expect(ops.skippedWorlds).toEqual([
+      expect.objectContaining({ worldId: 4030, worldName: '利維坦' }),
+    ]);
+  });
+
+  test('skippedWorlds empty when no worlds are skipped', () => {
+    const ops = computeSaveOps(null, formState([4028, 4029]), WORLDS);
+    expect(ops.skippedWorlds).toEqual([]);
+  });
+
+  test('mixed new and existing worlds → skippedWorlds has only the existing ones', () => {
+    const ops = computeSaveOps(existingGroup, formState([4028, 4030]), WORLDS);
+    expect(ops.postsNeeded.map(w => w.worldId)).toContain(4028);
+    expect(ops.skippedWorlds).toEqual([
+      expect.objectContaining({ worldId: 4030 }),
+    ]);
+  });
+
+  test('trigger change → skippedWorlds empty (world needs re-creation)', () => {
+    const newTrigger = { ...trigger, comparison: { lt: { target: 200 } } };
+    const ops = computeSaveOps(existingGroup, formState([4030], newTrigger), WORLDS);
+    expect(ops.skippedWorlds).toEqual([]);
+  });
+
   test('checked world with different trigger → in both postsNeeded and deletesAfterSuccess', () => {
     const newTrigger = { ...trigger, comparison: { lt: { target: 200 } } };
     const ops = computeSaveOps(existingGroup, formState([4030], newTrigger), WORLDS);

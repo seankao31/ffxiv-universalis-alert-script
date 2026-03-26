@@ -16,6 +16,7 @@ const SaveOps = (() => {
   function computeSaveOps(group, formState, worlds, currentAlertCount) {
     const postsNeeded = [];
     const deletesAfterSuccess = [];
+    const skippedWorlds = [];
 
     const existingByWorldId = new Map();
     if (group) {
@@ -44,8 +45,10 @@ const SaveOps = (() => {
           // Rule or name changed → POST new, DELETE old
           postsNeeded.push(world);
           deletesAfterSuccess.push({ alertId: existing.alertId, worldId: existing.worldId, worldName: existing.worldName || '' });
+        } else {
+          // Identical — already covered, skip
+          skippedWorlds.push({ worldId: existing.worldId, worldName: existing.worldName || '' });
         }
-        // else: identical — no-op
       }
     }
 
@@ -58,7 +61,7 @@ const SaveOps = (() => {
       capacityError = `Not enough alert slots (need ${postsNeeded.length}, only ${available + deletesAfterSuccess.length} available)`;
     }
 
-    return { postsNeeded, deletesAfterSuccess, netChange, capacityError };
+    return { postsNeeded, deletesAfterSuccess, skippedWorlds, netChange, capacityError };
   }
 
   /**

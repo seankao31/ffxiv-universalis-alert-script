@@ -191,7 +191,7 @@ const Modal = (() => {
     });
   }
 
-  function renderListView(container, { groups, nameMap, onEdit, onDelete, onNew, onClose, newAlertDisabled, alertCount }) {
+  function renderListView(container, { groups, nameMap, onEdit, onDelete, onNew, onClose, newAlertDisabled, alertCount, statusMessage }) {
     const sorted = [...groups].sort((a, b) => a.itemId - b.itemId);
     const rows = sorted.map((g, idx) => {
       const itemName = nameMap.get(g.itemId) || `Item #${g.itemId}`;
@@ -222,12 +222,17 @@ const Modal = (() => {
       ? `<div style="color:#888;font-size:13px;margin-bottom:12px">Alert slots: ${alertCount} / 40 used</div>`
       : '';
 
+    const statusBanner = statusMessage
+      ? `<div data-status-banner style="background:#3a3a1a;border:1px solid #665;color:#dda;font-size:13px;padding:8px 12px;border-radius:4px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center"><span>${escHtml(statusMessage)}</span><span data-action="dismiss-banner" style="cursor:pointer;color:#888;font-size:16px;margin-left:8px">\u2715</span></div>`
+      : '';
+
     container.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
         <h3 style="margin:0;color:#fff">Bulk Alerts</h3>
         <span data-action="close" style="cursor:pointer;color:#888;font-size:18px">\u2715</span>
       </div>
       ${capacityLine}
+      ${statusBanner}
       <div data-list-area style="max-height:500px;overflow-y:auto">${rows}</div>
       <div style="border-top:1px solid #333;margin-top:12px;padding-top:12px;text-align:center">
         <button data-action="new-alert" ${newAlertAttrs}>New Alert</button>
@@ -242,6 +247,7 @@ const Modal = (() => {
     const handler = (e) => {
       const action = e.target.dataset.action;
       if (action === 'close') { onClose(); return; }
+      if (action === 'dismiss-banner') { const banner = container.querySelector('[data-status-banner]'); if (banner) banner.remove(); return; }
       if (action === 'new-alert') { if (!newAlertDisabled) onNew(); return; }
       const idx = Number(e.target.dataset.groupIdx);
       const group = sorted[idx];
@@ -280,12 +286,13 @@ const Modal = (() => {
       innerContainer.querySelector('[data-action="close-empty"]').addEventListener('click', () => closeModal());
     }
 
-    function showListView(currentGroups, currentAlertCount) {
+    function showListView(currentGroups, currentAlertCount, statusMessage) {
       innerContainer.innerHTML = '';
       renderListView(innerContainer, {
         groups: currentGroups, nameMap,
         newAlertDisabled: !currentItemId,
         alertCount: currentAlertCount,
+        statusMessage,
         onEdit: (group) => showFormView(group, currentGroups, currentAlertCount),
         onDelete: (group, idx, btn) => {
           handleListDelete(group, idx, btn, innerContainer, () => {
@@ -354,13 +361,20 @@ const Modal = (() => {
         if (ops.postsNeeded.length === 0 && ops.deletesAfterSuccess.length === 0) {
           const label = nameMap.get(itemId) || formState.name || `Item #${itemId}`;
           const rule = formatRuleText(formState.trigger);
-          const msg = isEditing ? 'No changes to save' : `Alert "${label}" (${rule}) already exists`;
+          const msg = isEditing ? 'No changes to save' : `Alert "${label}" (${rule}) already exists on selected worlds`;
           const err = new Error(msg);
           err.isDuplicateError = true;
           throw err;
         }
         const availableSlots = _SaveOps().MAX_ALERTS - freshAlerts.length;
         await _SaveOps().executeSaveOps(ops, itemId, formState, { onProgress, availableSlots });
+
+        // Build status message for partial skips (new alerts only)
+        let statusMessage = null;
+        if (!isEditing && ops.skippedWorlds && ops.skippedWorlds.length > 0) {
+          const names = ops.skippedWorlds.map(w => w.worldName || w.worldId).join(', ');
+          statusMessage = `Skipped ${ops.skippedWorlds.length} world(s) where alert already exists: ${names}`;
+        }
 
         const updatedAlerts = await _API().getAlerts();
         const updatedGroups = _Grouping().groupAlerts(updatedAlerts);
@@ -379,7 +393,7 @@ const Modal = (() => {
           }
         }
 
-        showListView(updatedGroups, updatedAlerts.length);
+        showListView(updatedGroups, updatedAlerts.length, statusMessage);
       };
 
       renderFormView(innerContainer, { itemId, itemName, group, onSave, onBack });

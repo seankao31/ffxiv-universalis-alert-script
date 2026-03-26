@@ -172,7 +172,7 @@ describe('openBulkModal — duplicate alert detection', () => {
 
     const errorArea = modal.querySelector('[data-error-area]');
     expect(errorArea.style.display).toBe('block');
-    expect(errorArea.textContent).toContain('already exists');
+    expect(errorArea.textContent).toContain('already exists on selected worlds');
     expect(errorArea.textContent).toContain('Min Price <');
 
     const saveBtn = modal.querySelector('[data-action="save"]');
@@ -210,6 +210,51 @@ describe('openBulkModal — duplicate alert detection', () => {
     const opsArg = SaveOps.executeSaveOps.mock.calls[0][0];
     expect(opsArg.postsNeeded).toHaveLength(1);
     expect(opsArg.deletesAfterSuccess).toHaveLength(0);
+  });
+
+  test('"New Alert" shows status banner when some worlds were skipped', async () => {
+    GM_getValue.mockReturnValue('https://wh.com');
+    API.getAlerts.mockResolvedValue([]);
+    SaveOps.computeSaveOps.mockReturnValue({
+      postsNeeded: [{ worldId: 4031 }],
+      deletesAfterSuccess: [],
+      skippedWorlds: [{ worldId: 4030, worldName: '利維坦' }],
+      netChange: 1,
+      capacityError: null,
+    });
+    SaveOps.executeSaveOps.mockResolvedValue();
+
+    Modal.openBulkModal({ groups: [], nameMap, currentItemId: 44015, currentItemName: '木棉原木', alertCount: 0 });
+    const modal = document.querySelector('#univ-alert-modal');
+    modal.querySelector('[data-action="save"]').click();
+    await new Promise(r => setTimeout(r, 10));
+
+    const banner = modal.querySelector('[data-status-banner]');
+    expect(banner).not.toBeNull();
+    expect(banner.textContent).toContain('Skipped 1 world(s)');
+    expect(banner.textContent).toContain('利維坦');
+  });
+
+  test('status banner is dismissed when cross is clicked', async () => {
+    GM_getValue.mockReturnValue('https://wh.com');
+    API.getAlerts.mockResolvedValue([]);
+    SaveOps.computeSaveOps.mockReturnValue({
+      postsNeeded: [{ worldId: 4031 }],
+      deletesAfterSuccess: [],
+      skippedWorlds: [{ worldId: 4030, worldName: '利維坦' }],
+      netChange: 1,
+      capacityError: null,
+    });
+    SaveOps.executeSaveOps.mockResolvedValue();
+
+    Modal.openBulkModal({ groups: [], nameMap, currentItemId: 44015, currentItemName: '木棉原木', alertCount: 0 });
+    const modal = document.querySelector('#univ-alert-modal');
+    modal.querySelector('[data-action="save"]').click();
+    await new Promise(r => setTimeout(r, 10));
+
+    expect(modal.querySelector('[data-status-banner]')).not.toBeNull();
+    modal.querySelector('[data-action="dismiss-banner"]').click();
+    expect(modal.querySelector('[data-status-banner]')).toBeNull();
   });
 });
 
