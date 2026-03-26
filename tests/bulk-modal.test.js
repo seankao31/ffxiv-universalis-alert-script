@@ -65,6 +65,15 @@ describe('openBulkModal — navigation', () => {
     expect(modal.querySelector('[data-field="name"]')).toBeNull();
   });
 
+  test('"← Back to alerts" preserves capacity display', () => {
+    Modal.openBulkModal({ groups, nameMap, currentItemId: 44015, currentItemName: '木棉原木', alertCount: 12 });
+    const modal = document.querySelector('#univ-alert-modal');
+    expect(modal.textContent).toContain('Alert slots: 12 / 40 used');
+    modal.querySelector('[data-action="new-alert"]').click();
+    modal.querySelector('[data-action="back"]').click();
+    expect(modal.textContent).toContain('Alert slots: 12 / 40 used');
+  });
+
   test('Edit button navigates to form pre-filled with group data', () => {
     Modal.openBulkModal({ groups, nameMap, currentItemId: 44015, currentItemName: '木棉原木', alertCount: 0 });
     const modal = document.querySelector('#univ-alert-modal');

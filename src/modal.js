@@ -275,24 +275,24 @@ const Modal = (() => {
         groups: currentGroups, nameMap,
         newAlertDisabled: !currentItemId,
         alertCount: currentAlertCount,
-        onEdit: (group) => showFormView(group, currentGroups),
+        onEdit: (group) => showFormView(group, currentGroups, currentAlertCount),
         onDelete: (group, idx, btn) => {
           handleListDelete(group, idx, btn, innerContainer, () => {
             if (currentItemId) {
-              showFormView(null, null);
+              showFormView(null, null, currentAlertCount);
             } else {
               showEmptyState();
             }
           });
         },
-        onNew: () => showFormView(null, currentGroups),
+        onNew: () => showFormView(null, currentGroups, currentAlertCount),
         onClose: () => closeModal(),
       });
     }
 
-    function showFormView(group, currentGroupsForBack) {
+    function showFormView(group, currentGroupsForBack, currentAlertCount) {
       innerContainer.innerHTML = '';
-      const onBack = currentGroupsForBack ? () => showListView(currentGroupsForBack) : null;
+      const onBack = currentGroupsForBack ? () => showListView(currentGroupsForBack, currentAlertCount) : null;
       const itemId = group ? group.itemId : currentItemId;
       const itemName = group ? (nameMap.get(group.itemId) || `Item #${group.itemId}`) : currentItemName;
 
