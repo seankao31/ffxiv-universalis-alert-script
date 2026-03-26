@@ -1,10 +1,10 @@
 const Grouping = (() => {
   const TRIGGER_KEY_ORDER = ['filters', 'mapper', 'reducer', 'comparison'];
+  const SORTED_TRIGGER_KEYS = [...TRIGGER_KEY_ORDER].sort();
 
   function normalizeTrigger(trigger) {
     const triggerKeys = Object.keys(trigger).sort();
-    const allowedKeys = [...TRIGGER_KEY_ORDER].sort();
-    if (JSON.stringify(triggerKeys) !== JSON.stringify(allowedKeys)) return null;
+    if (JSON.stringify(triggerKeys) !== JSON.stringify(SORTED_TRIGGER_KEYS)) return null;
 
     const normalized = {};
     for (const key of TRIGGER_KEY_ORDER) {

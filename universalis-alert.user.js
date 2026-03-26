@@ -39,11 +39,11 @@ if (typeof module !== 'undefined') module.exports = WorldMap;
 // ===== src/grouping.js =====
 const Grouping = (() => {
   const TRIGGER_KEY_ORDER = ['filters', 'mapper', 'reducer', 'comparison'];
+  const SORTED_TRIGGER_KEYS = [...TRIGGER_KEY_ORDER].sort();
 
   function normalizeTrigger(trigger) {
     const triggerKeys = Object.keys(trigger).sort();
-    const allowedKeys = [...TRIGGER_KEY_ORDER].sort();
-    if (JSON.stringify(triggerKeys) !== JSON.stringify(allowedKeys)) return null;
+    if (JSON.stringify(triggerKeys) !== JSON.stringify(SORTED_TRIGGER_KEYS)) return null;
 
     const normalized = {};
     for (const key of TRIGGER_KEY_ORDER) {
@@ -189,8 +189,6 @@ if (typeof module !== 'undefined') module.exports = API;
 
 // ===== src/save-ops.js =====
 const SaveOps = (() => {
-  // Requires: Grouping (for normalizeTrigger), API — injected via globals in TM context
-  // In test context, required via module.exports
   const _Grouping = typeof Grouping !== 'undefined' ? Grouping : require('./grouping');
   const _API = typeof API !== 'undefined' ? API : require('./api');
 
@@ -216,19 +214,17 @@ const SaveOps = (() => {
     }
 
     const newTriggerKey = _Grouping.normalizeTrigger(formState.trigger);
+    const existingTriggerKey = group ? _Grouping.normalizeTrigger(group.trigger) : null;
 
     for (const world of worlds) {
       const existing = existingByWorldId.get(world.worldId);
       const isSelected = formState.selectedWorldIds.has(world.worldId);
 
       if (isSelected && !existing) {
-        // Newly checked, no existing alert → POST
         postsNeeded.push(world);
       } else if (!isSelected && existing) {
-        // Unchecked, had existing alert → DELETE after success
         deletesAfterSuccess.push({ alertId: existing.alertId, worldId: existing.worldId, worldName: existing.worldName || '' });
       } else if (isSelected && existing) {
-        const existingTriggerKey = _Grouping.normalizeTrigger(group.trigger);
         const triggerChanged = newTriggerKey !== existingTriggerKey;
         const nameChanged = formState.name !== group.name;
         if (triggerChanged || nameChanged) {
@@ -254,21 +250,38 @@ const SaveOps = (() => {
     return { postsNeeded, deletesAfterSuccess, skippedWorlds, netChange, capacityError };
   }
 
-  /**
-   * Executes save ops with capacity-aware interleaving.
-   * When slots are limited, interleaves POST and DELETE batches to stay within capacity.
-   * When availableSlots is not provided, defaults to posting all at once (backward compat).
-   * Throws if any POST fails (no further operations will run).
-   * @param {object}   ops
-   * @param {number}   itemId
-   * @param {object}   formState
-   * @param {object}   [options]
-   * @param {function} [options.onProgress] - called after each request settles: ({ phase, completed, total })
-   * @param {number}   [options.availableSlots] - how many new alerts can be created before hitting capacity
-   */
+  function getFailedIndices(results) {
+    return results
+      .map((r, i) => r.status === 'rejected' ? i : -1)
+      .filter(i => i !== -1);
+  }
+
+  function sortDeletesByReplacement(deletes, postedWorldIds) {
+    deletes.sort((a, b) => {
+      const aReplaced = postedWorldIds.has(a.worldId) ? 0 : 1;
+      const bReplaced = postedWorldIds.has(b.worldId) ? 0 : 1;
+      return aReplaced - bReplaced;
+    });
+  }
+
+  async function runDeleteBatch(batch, onEachDone) {
+    const results = await Promise.allSettled(
+      batch.map(async (entry) => {
+        try {
+          return await _API.deleteAlert(entry.alertId);
+        } finally {
+          onEachDone();
+        }
+      })
+    );
+    const failed = getFailedIndices(results);
+    if (failed.length > 0) {
+      const names = failed.map(i => batch[i].worldName || batch[i].worldId).join(', ');
+      throw new Error(`Alerts saved, but failed to remove old alerts for: ${names}. These may need manual cleanup.`);
+    }
+  }
+
   async function executeSaveOps(ops, itemId, formState, { onProgress, availableSlots } = {}) {
-    // Default to postsNeeded.length (all fit in one batch) when availableSlots is not passed.
-    // This preserves pre-interleaving behavior for callers that don't track capacity.
     let slots = typeof availableSlots === 'number' ? availableSlots : ops.postsNeeded.length;
 
     const pendingPosts = ops.postsNeeded.map((world, i) => ({ world, index: i }));
@@ -279,8 +292,12 @@ const SaveOps = (() => {
     let postCompleted = 0;
     let deleteCompleted = 0;
 
+    const onDeleteDone = () => {
+      deleteCompleted++;
+      onProgress?.({ phase: 'removing', completed: deleteCompleted, total: totalDeletes });
+    };
+
     while (pendingPosts.length > 0 || pendingDeletes.length > 0) {
-      // Phase 1: POST as many as slots allow
       const postBatchSize = Math.min(pendingPosts.length, slots);
       if (postBatchSize > 0) {
         const batch = pendingPosts.splice(0, postBatchSize);
@@ -302,86 +319,33 @@ const SaveOps = (() => {
           })
         );
 
-        const failedIndices = results
-          .map((r, i) => r.status === 'rejected' ? i : -1)
-          .filter(i => i !== -1);
-        if (failedIndices.length > 0) {
-          const names = failedIndices.map(i => batch[i].world.worldName || batch[i].world.worldId).join(', ');
+        const failed = getFailedIndices(results);
+        if (failed.length > 0) {
+          const names = failed.map(i => batch[i].world.worldName || batch[i].world.worldId).join(', ');
           throw new Error(`Failed to save alerts for: ${names}`);
         }
 
-        // Track which worlds have been successfully posted
         for (const { world } of batch) {
           postedWorldIds.add(world.worldId);
         }
         slots -= batch.length;
       }
 
-      // If no more POSTs needed, break to final DELETE phase
       if (pendingPosts.length === 0) break;
 
-      // Phase 2: Need more slots — DELETE to free capacity
-      // Prefer "safe" deletes: old alerts whose replacements have been POSTed
-      pendingDeletes.sort((a, b) => {
-        const aReplaced = postedWorldIds.has(a.worldId) ? 0 : 1;
-        const bReplaced = postedWorldIds.has(b.worldId) ? 0 : 1;
-        return aReplaced - bReplaced;
-      });
+      sortDeletesByReplacement(pendingDeletes, postedWorldIds);
 
-      // Delete enough to make room for remaining POSTs (at least 1)
       const deleteBatchSize = Math.min(pendingDeletes.length, pendingPosts.length);
-      if (deleteBatchSize === 0) break; // safety: no deletes possible, avoid infinite loop
+      if (deleteBatchSize === 0) break;
 
       const deleteBatch = pendingDeletes.splice(0, deleteBatchSize);
-      const deleteResults = await Promise.allSettled(
-        deleteBatch.map(async (entry) => {
-          try {
-            return await _API.deleteAlert(entry.alertId);
-          } finally {
-            deleteCompleted++;
-            onProgress?.({ phase: 'removing', completed: deleteCompleted, total: totalDeletes });
-          }
-        })
-      );
-
-      const failedDeleteIndices = deleteResults
-        .map((r, i) => r.status === 'rejected' ? i : -1)
-        .filter(i => i !== -1);
-      if (failedDeleteIndices.length > 0) {
-        const names = failedDeleteIndices.map(i => deleteBatch[i].worldName || deleteBatch[i].worldId).join(', ');
-        throw new Error(`Alerts saved, but failed to remove old alerts for: ${names}. These may need manual cleanup.`);
-      }
-
+      await runDeleteBatch(deleteBatch, onDeleteDone);
       slots += deleteBatch.length;
     }
 
-    // Final phase: delete remaining old alerts (pure removals + remaining replacements)
     if (pendingDeletes.length > 0) {
-      // Sort: replaced alerts first (safe), unreplaced last
-      pendingDeletes.sort((a, b) => {
-        const aReplaced = postedWorldIds.has(a.worldId) ? 0 : 1;
-        const bReplaced = postedWorldIds.has(b.worldId) ? 0 : 1;
-        return aReplaced - bReplaced;
-      });
-
-      const deleteResults = await Promise.allSettled(
-        pendingDeletes.map(async (entry) => {
-          try {
-            return await _API.deleteAlert(entry.alertId);
-          } finally {
-            deleteCompleted++;
-            onProgress?.({ phase: 'removing', completed: deleteCompleted, total: totalDeletes });
-          }
-        })
-      );
-
-      const failedDeleteIndices = deleteResults
-        .map((r, i) => r.status === 'rejected' ? i : -1)
-        .filter(i => i !== -1);
-      if (failedDeleteIndices.length > 0) {
-        const names = failedDeleteIndices.map(i => pendingDeletes[i].worldName || pendingDeletes[i].worldId).join(', ');
-        throw new Error(`Alerts saved, but failed to remove old alerts for: ${names}. These may need manual cleanup.`);
-      }
+      sortDeletesByReplacement(pendingDeletes, postedWorldIds);
+      await runDeleteBatch(pendingDeletes, onDeleteDone);
     }
   }
 
@@ -421,8 +385,12 @@ const Modal = (() => {
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
+  function worldPillHtml(w) {
+    return `<span data-world-pill style="background:#1a3a5c;border-radius:12px;padding:2px 8px;font-size:12px;margin:2px;display:inline-block">${w.worldName || w.worldId}</span>`;
+  }
+
   const METRIC_LABELS = { pricePerUnit: 'Price Per Unit', quantity: 'Quantity', total: 'Total' };
-  const MAPPER_VALUES = ['pricePerUnit', 'quantity', 'total'];
+  const MAPPER_VALUES = Object.keys(METRIC_LABELS);
   const REDUCER_VALUES = ['min', 'max', 'mean'];
   const COMPARATOR_VALUES = ['lt', 'gt'];
 
@@ -440,21 +408,22 @@ const Modal = (() => {
     };
   }
 
-  function formatRule(trigger) {
+  const RULE_METRIC_LABELS = { pricePerUnit: 'Price', quantity: 'Quantity', total: 'Total' };
+  const RULE_REDUCER_LABELS = { min: 'Min', max: 'Max', mean: 'Avg' };
+
+  function formatRuleLabel(trigger) {
     const comparator = 'lt' in trigger.comparison ? '<' : '>';
     const target = trigger.comparison[Object.keys(trigger.comparison)[0]].target;
-    const metricLabels = { pricePerUnit: 'Price', quantity: 'Quantity', total: 'Total' };
-    const reducerLabels = { min: 'Min', max: 'Max', mean: 'Avg' };
-    const label = `${reducerLabels[trigger.reducer] || trigger.reducer} ${metricLabels[trigger.mapper] || trigger.mapper} ${comparator} ${target}`;
+    return `${RULE_REDUCER_LABELS[trigger.reducer] || trigger.reducer} ${RULE_METRIC_LABELS[trigger.mapper] || trigger.mapper} ${comparator} ${target}`;
+  }
+
+  function formatRule(trigger) {
+    const label = formatRuleLabel(trigger);
     return trigger.filters.includes('hq') ? `${label} <span style="background:#4a8a4a;border-radius:3px;padding:0 4px;font-size:11px">HQ</span>` : label;
   }
 
   function formatRuleText(trigger) {
-    const comparator = 'lt' in trigger.comparison ? '<' : '>';
-    const target = trigger.comparison[Object.keys(trigger.comparison)[0]].target;
-    const metricLabels = { pricePerUnit: 'Price', quantity: 'Quantity', total: 'Total' };
-    const reducerLabels = { min: 'Min', max: 'Max', mean: 'Avg' };
-    const label = `${reducerLabels[trigger.reducer] || trigger.reducer} ${metricLabels[trigger.mapper] || trigger.mapper} ${comparator} ${target}`;
+    const label = formatRuleLabel(trigger);
     return trigger.filters.includes('hq') ? `${label} HQ` : label;
   }
 
@@ -599,9 +568,7 @@ const Modal = (() => {
     const sorted = [...groups].sort((a, b) => a.itemId - b.itemId);
     const rows = sorted.map((g, idx) => {
       const itemName = nameMap.get(g.itemId) || `Item #${g.itemId}`;
-      const worldPills = g.worlds.map(w =>
-        `<span data-world-pill style="background:#1a3a5c;border-radius:12px;padding:2px 8px;font-size:12px;margin:2px;display:inline-block">${w.worldName || w.worldId}</span>`
-      ).join('');
+      const worldPills = g.worlds.map(worldPillHtml).join('');
       return `
         <div data-group-row="${idx}" style="background:#2a2a4a;padding:10px;border-radius:4px;margin-bottom:8px">
           <div style="display:flex;justify-content:space-between;align-items:flex-start">
@@ -718,6 +685,13 @@ const Modal = (() => {
       });
     }
 
+    function enrichGroups(groups) {
+      groups.forEach(g => {
+        g.worlds = g.worlds.map(w => ({ ...w, worldName: _WorldMap.worldById(w.worldId)?.worldName || '' }));
+        g.worlds.sort((a, b) => a.worldId - b.worldId);
+      });
+    }
+
     function showFormView(group, currentGroupsForBack, currentAlertCount) {
       innerContainer.innerHTML = '';
       const onBack = currentGroupsForBack ? () => showListView(currentGroupsForBack, currentAlertCount) : null;
@@ -728,10 +702,7 @@ const Modal = (() => {
         onProgress?.({ phase: 'refreshing' });
         const freshAlerts = await _API().getAlerts();
         const freshGroups = _Grouping().groupAlerts(freshAlerts);
-        freshGroups.forEach(g => {
-          g.worlds = g.worlds.map(w => ({ ...w, worldName: _WorldMap.worldById(w.worldId)?.worldName || '' }));
-          g.worlds.sort((a, b) => a.worldId - b.worldId);
-        });
+        enrichGroups(freshGroups);
 
         const normalizeTrigger = _Grouping().normalizeTrigger;
         const isEditing = !!group;
@@ -788,10 +759,7 @@ const Modal = (() => {
 
         const updatedAlerts = await _API().getAlerts();
         const updatedGroups = _Grouping().groupAlerts(updatedAlerts);
-        updatedGroups.forEach(g => {
-          g.worlds = g.worlds.map(w => ({ ...w, worldName: _WorldMap.worldById(w.worldId)?.worldName || '' }));
-          g.worlds.sort((a, b) => a.worldId - b.worldId);
-        });
+        enrichGroups(updatedGroups);
 
         // Re-read <h1> for current page item — it may not have been rendered
         // when handleClick first ran (SPA navigations render content async)
@@ -867,9 +835,7 @@ const Modal = (() => {
       // Update world pills
       const row = container.querySelector(`[data-group-row="${idx}"]`);
       const pillsContainer = row.querySelector('[data-world-pills]');
-      pillsContainer.innerHTML = failures
-        .map(w => `<span data-world-pill style="background:#1a3a5c;border-radius:12px;padding:2px 8px;font-size:12px;margin:2px;display:inline-block">${w.worldName || w.worldId}</span>`)
-        .join('');
+      pillsContainer.innerHTML = failures.map(worldPillHtml).join('');
     }
   }
 
@@ -936,7 +902,7 @@ const HeaderButton = (() => {
     btn.style.cssText = 'background:#bc9df9;border:none;color:#fff;padding:8px 16px;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;margin-right:8px;font-weight:700';
     btn.addEventListener('mouseenter', () => { btn.style.background = '#a07de0'; });
     btn.addEventListener('mouseleave', () => { btn.style.background = '#bc9df9'; });
-    btn.addEventListener('click', () => handleClick());
+    btn.addEventListener('click', handleClick);
     section.insertBefore(btn, section.firstChild);
   }
 

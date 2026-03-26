@@ -54,7 +54,7 @@ const HeaderButton = (() => {
     btn.style.cssText = 'background:#bc9df9;border:none;color:#fff;padding:8px 16px;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;margin-right:8px;font-weight:700';
     btn.addEventListener('mouseenter', () => { btn.style.background = '#a07de0'; });
     btn.addEventListener('mouseleave', () => { btn.style.background = '#bc9df9'; });
-    btn.addEventListener('click', () => handleClick());
+    btn.addEventListener('click', handleClick);
     section.insertBefore(btn, section.firstChild);
   }
 

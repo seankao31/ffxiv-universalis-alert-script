@@ -27,8 +27,12 @@ const Modal = (() => {
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
+  function worldPillHtml(w) {
+    return `<span data-world-pill style="background:#1a3a5c;border-radius:12px;padding:2px 8px;font-size:12px;margin:2px;display:inline-block">${w.worldName || w.worldId}</span>`;
+  }
+
   const METRIC_LABELS = { pricePerUnit: 'Price Per Unit', quantity: 'Quantity', total: 'Total' };
-  const MAPPER_VALUES = ['pricePerUnit', 'quantity', 'total'];
+  const MAPPER_VALUES = Object.keys(METRIC_LABELS);
   const REDUCER_VALUES = ['min', 'max', 'mean'];
   const COMPARATOR_VALUES = ['lt', 'gt'];
 
@@ -46,21 +50,22 @@ const Modal = (() => {
     };
   }
 
-  function formatRule(trigger) {
+  const RULE_METRIC_LABELS = { pricePerUnit: 'Price', quantity: 'Quantity', total: 'Total' };
+  const RULE_REDUCER_LABELS = { min: 'Min', max: 'Max', mean: 'Avg' };
+
+  function formatRuleLabel(trigger) {
     const comparator = 'lt' in trigger.comparison ? '<' : '>';
     const target = trigger.comparison[Object.keys(trigger.comparison)[0]].target;
-    const metricLabels = { pricePerUnit: 'Price', quantity: 'Quantity', total: 'Total' };
-    const reducerLabels = { min: 'Min', max: 'Max', mean: 'Avg' };
-    const label = `${reducerLabels[trigger.reducer] || trigger.reducer} ${metricLabels[trigger.mapper] || trigger.mapper} ${comparator} ${target}`;
+    return `${RULE_REDUCER_LABELS[trigger.reducer] || trigger.reducer} ${RULE_METRIC_LABELS[trigger.mapper] || trigger.mapper} ${comparator} ${target}`;
+  }
+
+  function formatRule(trigger) {
+    const label = formatRuleLabel(trigger);
     return trigger.filters.includes('hq') ? `${label} <span style="background:#4a8a4a;border-radius:3px;padding:0 4px;font-size:11px">HQ</span>` : label;
   }
 
   function formatRuleText(trigger) {
-    const comparator = 'lt' in trigger.comparison ? '<' : '>';
-    const target = trigger.comparison[Object.keys(trigger.comparison)[0]].target;
-    const metricLabels = { pricePerUnit: 'Price', quantity: 'Quantity', total: 'Total' };
-    const reducerLabels = { min: 'Min', max: 'Max', mean: 'Avg' };
-    const label = `${reducerLabels[trigger.reducer] || trigger.reducer} ${metricLabels[trigger.mapper] || trigger.mapper} ${comparator} ${target}`;
+    const label = formatRuleLabel(trigger);
     return trigger.filters.includes('hq') ? `${label} HQ` : label;
   }
 
@@ -205,9 +210,7 @@ const Modal = (() => {
     const sorted = [...groups].sort((a, b) => a.itemId - b.itemId);
     const rows = sorted.map((g, idx) => {
       const itemName = nameMap.get(g.itemId) || `Item #${g.itemId}`;
-      const worldPills = g.worlds.map(w =>
-        `<span data-world-pill style="background:#1a3a5c;border-radius:12px;padding:2px 8px;font-size:12px;margin:2px;display:inline-block">${w.worldName || w.worldId}</span>`
-      ).join('');
+      const worldPills = g.worlds.map(worldPillHtml).join('');
       return `
         <div data-group-row="${idx}" style="background:#2a2a4a;padding:10px;border-radius:4px;margin-bottom:8px">
           <div style="display:flex;justify-content:space-between;align-items:flex-start">
@@ -324,6 +327,13 @@ const Modal = (() => {
       });
     }
 
+    function enrichGroups(groups) {
+      groups.forEach(g => {
+        g.worlds = g.worlds.map(w => ({ ...w, worldName: _WorldMap.worldById(w.worldId)?.worldName || '' }));
+        g.worlds.sort((a, b) => a.worldId - b.worldId);
+      });
+    }
+
     function showFormView(group, currentGroupsForBack, currentAlertCount) {
       innerContainer.innerHTML = '';
       const onBack = currentGroupsForBack ? () => showListView(currentGroupsForBack, currentAlertCount) : null;
@@ -334,10 +344,7 @@ const Modal = (() => {
         onProgress?.({ phase: 'refreshing' });
         const freshAlerts = await _API().getAlerts();
         const freshGroups = _Grouping().groupAlerts(freshAlerts);
-        freshGroups.forEach(g => {
-          g.worlds = g.worlds.map(w => ({ ...w, worldName: _WorldMap.worldById(w.worldId)?.worldName || '' }));
-          g.worlds.sort((a, b) => a.worldId - b.worldId);
-        });
+        enrichGroups(freshGroups);
 
         const normalizeTrigger = _Grouping().normalizeTrigger;
         const isEditing = !!group;
@@ -394,10 +401,7 @@ const Modal = (() => {
 
         const updatedAlerts = await _API().getAlerts();
         const updatedGroups = _Grouping().groupAlerts(updatedAlerts);
-        updatedGroups.forEach(g => {
-          g.worlds = g.worlds.map(w => ({ ...w, worldName: _WorldMap.worldById(w.worldId)?.worldName || '' }));
-          g.worlds.sort((a, b) => a.worldId - b.worldId);
-        });
+        enrichGroups(updatedGroups);
 
         // Re-read <h1> for current page item — it may not have been rendered
         // when handleClick first ran (SPA navigations render content async)
@@ -473,9 +477,7 @@ const Modal = (() => {
       // Update world pills
       const row = container.querySelector(`[data-group-row="${idx}"]`);
       const pillsContainer = row.querySelector('[data-world-pills]');
-      pillsContainer.innerHTML = failures
-        .map(w => `<span data-world-pill style="background:#1a3a5c;border-radius:12px;padding:2px 8px;font-size:12px;margin:2px;display:inline-block">${w.worldName || w.worldId}</span>`)
-        .join('');
+      pillsContainer.innerHTML = failures.map(worldPillHtml).join('');
     }
   }
 
