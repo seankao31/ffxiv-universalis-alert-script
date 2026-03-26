@@ -9,6 +9,7 @@
 // @match        https://universalis.app/*
 // @grant        GM_getValue
 // @grant        GM_setValue
+// @require      https://storage.ko-fi.com/cdn/widget/Widget_2.js
 // ==/UserScript==
 
 
@@ -402,6 +403,20 @@ const Modal = (() => {
   function _Grouping() { return typeof Grouping !== 'undefined' ? Grouping : _groupingModule; }
   function _SaveOps() { return typeof SaveOps !== 'undefined' ? SaveOps : _saveOpsModule; }
 
+  function injectKofi(container) {
+    if (typeof kofiwidget2 === 'undefined') return;
+    const el = container.querySelector('[data-kofi-container]');
+    if (!el) return;
+    kofiwidget2.init('Support this project', '#bc9df9', 'Y8Y41WOCXM');
+    el.innerHTML = kofiwidget2.getHTML();
+    const btn = el.querySelector('.kofi-button');
+    if (btn) btn.style.cssText += 'padding:4px 10px !important;line-height:1 !important;font-size:12px !important;border-radius:4px !important;';
+    const img = el.querySelector('.kofiimg');
+    if (img) img.style.cssText += 'height:13px !important;width:auto !important;vertical-align:middle !important;padding-top:0 !important;';
+    const text = el.querySelector('.kofitext');
+    if (text) text.style.cssText += 'line-height:1 !important;';
+  }
+
   function escHtml(s) {
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
@@ -627,7 +642,7 @@ const Modal = (() => {
         <button data-action="new-alert" ${newAlertAttrs}>New Alert</button>
       </div>
       <div data-attribution style="border-top:1px solid #333;margin-top:32px;padding-top:12px;text-align:center;color:#555;font-size:11px">Made with \u2665 by Yshan</div>
-      <div style="text-align:center;margin-top:6px"><a href="https://ko-fi.com/Y8Y41WOCXM" target="_blank"><img style="height:28px;border:0" src="https://storage.ko-fi.com/cdn/kofi4.png?v=6" alt="Ko-fi" /></a></div>`;
+      <div data-kofi-container style="text-align:center;margin-top:6px"></div>`;
 
     // Event delegation — remove stale listener from previous render to avoid duplicates.
     // innerHTML = '' only removes child nodes, not listeners on the container itself,
@@ -648,6 +663,7 @@ const Modal = (() => {
     };
     container._listClickHandler = handler;
     container.addEventListener('click', handler);
+    injectKofi(container);
   }
 
   function openBulkModal({ groups, nameMap, currentItemId, currentItemName, alertCount }) {
@@ -675,8 +691,9 @@ const Modal = (() => {
         </div>
         <p style="color:#888;text-align:center;padding:24px 0">No alerts yet. Navigate to an item page to create one.</p>
         <div data-attribution style="text-align:center;color:#555;font-size:11px;margin-top:20px">Made with \u2665 by Yshan</div>
-      <div style="text-align:center;margin-top:6px"><a href="https://ko-fi.com/Y8Y41WOCXM" target="_blank"><img style="height:28px;border:0" src="https://storage.ko-fi.com/cdn/kofi4.png?v=6" alt="Ko-fi" /></a></div>`;
+      <div data-kofi-container style="text-align:center;margin-top:6px"></div>`;
       innerContainer.querySelector('[data-action="close-empty"]').addEventListener('click', () => closeModal());
+      injectKofi(innerContainer);
     }
 
     function showListView(currentGroups, currentAlertCount, statusMessage) {

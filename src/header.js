@@ -8,4 +8,5 @@
 // @match        https://universalis.app/*
 // @grant        GM_getValue
 // @grant        GM_setValue
+// @require      https://storage.ko-fi.com/cdn/widget/Widget_2.js
 // ==/UserScript==
