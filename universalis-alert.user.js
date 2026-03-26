@@ -596,8 +596,8 @@ const Modal = (() => {
     }).join('');
 
     const newAlertAttrs = newAlertDisabled
-      ? 'disabled title="Navigate to an item page to create alerts" style="background:#333;border:none;color:#666;padding:8px 20px;border-radius:4px;cursor:not-allowed;display:inline-flex;align-items:center;justify-content:center"'
-      : 'style="background:#1a5a2a;border:none;color:#fff;padding:8px 20px;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center"';
+      ? 'disabled title="Navigate to an item page to create alerts" style="background:#333;border:none;color:#666;padding:12px 32px;border-radius:6px;cursor:not-allowed;display:inline-flex;align-items:center;justify-content:center;font-size:16px"'
+      : 'style="background:#1a5a2a;border:none;color:#fff;padding:12px 32px;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-size:16px"';
 
     const capacityLine = typeof alertCount === 'number'
       ? `<div style="color:#888;font-size:13px;margin-bottom:12px">Alert slots: ${alertCount} / 40 used</div>`
@@ -615,10 +615,11 @@ const Modal = (() => {
       ${capacityLine}
       ${statusBanner}
       <div data-list-area style="max-height:500px;overflow-y:auto">${rows}</div>
-      <div style="border-top:1px solid #333;margin-top:12px;padding-top:12px;text-align:center">
+      <div style="margin-top:12px;text-align:center">
         <button data-action="new-alert" ${newAlertAttrs}>New Alert</button>
       </div>
-      <div data-attribution style="text-align:center;color:#555;font-size:11px;margin-top:12px">Made with \u2665 by Yshan</div>`;
+      <div data-attribution style="border-top:1px solid #333;margin-top:32px;padding-top:12px;text-align:center;color:#555;font-size:11px">Made with \u2665 by Yshan</div>
+      <div style="text-align:center;margin-top:6px"><a href="https://ko-fi.com/Y8Y41WOCXM" target="_blank"><img style="height:28px;border:0" src="https://storage.ko-fi.com/cdn/kofi4.png?v=6" alt="Ko-fi" /></a></div>`;
 
     // Event delegation — remove stale listener from previous render to avoid duplicates.
     // innerHTML = '' only removes child nodes, not listeners on the container itself,
@@ -665,7 +666,8 @@ const Modal = (() => {
           <span data-action="close-empty" style="cursor:pointer;color:#888;font-size:18px">\u2715</span>
         </div>
         <p style="color:#888;text-align:center;padding:24px 0">No alerts yet. Navigate to an item page to create one.</p>
-        <div data-attribution style="text-align:center;color:#555;font-size:11px;margin-top:12px">Made with \u2665 by Yshan</div>`;
+        <div data-attribution style="text-align:center;color:#555;font-size:11px;margin-top:20px">Made with \u2665 by Yshan</div>
+      <div style="text-align:center;margin-top:6px"><a href="https://ko-fi.com/Y8Y41WOCXM" target="_blank"><img style="height:28px;border:0" src="https://storage.ko-fi.com/cdn/kofi4.png?v=6" alt="Ko-fi" /></a></div>`;
       innerContainer.querySelector('[data-action="close-empty"]').addEventListener('click', () => closeModal());
     }
 
