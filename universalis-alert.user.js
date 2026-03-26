@@ -916,7 +916,7 @@ const HeaderButton = (() => {
     const btn = document.createElement('button');
     btn.id = 'univ-alert-btn';
     btn.textContent = '\uD83D\uDD14 Bulk Alerts';
-    btn.style.cssText = 'background:#1a5a8a;border:none;color:#fff;padding:8px 16px;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;margin-right:8px';
+    btn.style.cssText = 'background:#bc9df9;border:none;color:#fff;padding:8px 16px;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;margin-right:8px';
     btn.addEventListener('click', () => handleClick());
     section.insertBefore(btn, section.firstChild);
   }
