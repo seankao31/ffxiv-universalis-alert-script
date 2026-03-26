@@ -13,6 +13,9 @@
 *.swp
 *.swo
 
+# Playwright MCP
+.playwright-mcp/
+
 # Node
 node_modules/
 bun.lock
