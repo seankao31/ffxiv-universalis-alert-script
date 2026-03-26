@@ -42,7 +42,7 @@ describe('injectButton', () => {
   test('button has correct text', () => {
     setupHeader();
     HeaderButton.injectButton();
-    expect(document.getElementById('univ-alert-btn').textContent).toBe('🔔 Bulk Alerts');
+    expect(document.getElementById('univ-alert-btn').textContent).toBe('Bulk Alerts');
   });
 
   test('is idempotent — does not duplicate', () => {
