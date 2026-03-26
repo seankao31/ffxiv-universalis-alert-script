@@ -121,7 +121,7 @@ describe('openBulkModal — form save returns to list', () => {
     const updatedAlert = { id: 'a1', itemId: 44015, worldId: 4030, name: 'Alert', discordWebhook: 'https://wh.com', triggerVersion: 0, trigger };
     const newAlert = { id: 'a3', itemId: 44015, worldId: 4031, name: 'Alert', discordWebhook: 'https://wh.com', triggerVersion: 0, trigger };
     API.getAlerts.mockResolvedValue([updatedAlert, newAlert]);
-    SaveOps.computeSaveOps.mockReturnValue({ postsNeeded: [], deletesAfterSuccess: [] });
+    SaveOps.computeSaveOps.mockReturnValue({ postsNeeded: [{ worldId: 4031 }], deletesAfterSuccess: [] });
     SaveOps.executeSaveOps.mockResolvedValue();
     GM_getValue.mockReturnValue('https://wh.com');
 
@@ -151,6 +151,65 @@ describe('openBulkModal — no duplicate deletes after navigation', () => {
     modal.querySelector('[data-action="delete"]').click();
     await new Promise(r => setTimeout(r, 0));
     expect(API.deleteAlert).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('openBulkModal — duplicate alert detection', () => {
+  test('shows "already exists" error when no ops are needed', async () => {
+    GM_getValue.mockReturnValue('https://wh.com');
+    API.getAlerts.mockResolvedValue([]);
+    SaveOps.computeSaveOps.mockReturnValue({
+      postsNeeded: [],
+      deletesAfterSuccess: [],
+      netChange: 0,
+      capacityError: null,
+    });
+
+    Modal.openBulkModal({ groups: [], nameMap, currentItemId: 44015, currentItemName: '木棉原木', alertCount: 0 });
+    const modal = document.querySelector('#univ-alert-modal');
+    modal.querySelector('[data-action="save"]').click();
+    await new Promise(r => setTimeout(r, 10));
+
+    const errorArea = modal.querySelector('[data-error-area]');
+    expect(errorArea.style.display).toBe('block');
+    expect(errorArea.textContent).toContain('already exists');
+    expect(errorArea.textContent).toContain('Min Price <');
+
+    const saveBtn = modal.querySelector('[data-action="save"]');
+    expect(saveBtn.disabled).toBe(false);
+    expect(saveBtn.textContent).toBe('Save');
+
+    expect(SaveOps.executeSaveOps).not.toHaveBeenCalled();
+  });
+
+  test('"New Alert" strips deletes so existing alerts are not removed', async () => {
+    GM_getValue.mockReturnValue('https://wh.com');
+    API.getAlerts.mockResolvedValue([]);
+    // computeSaveOps returns both posts and deletes (as if editing)
+    SaveOps.computeSaveOps.mockReturnValue({
+      postsNeeded: [{ worldId: 4031 }],
+      deletesAfterSuccess: [{ alertId: 'a1', worldId: 4030, worldName: '利維坦' }],
+      netChange: 0,
+      capacityError: null,
+    });
+    SaveOps.executeSaveOps.mockResolvedValue();
+    API.getAlerts.mockResolvedValue([]);
+
+    // Open with existing group, then click "New Alert" (not Edit)
+    const groups = [{
+      itemId: 44015, name: 'Alert', discordWebhook: 'https://wh.com', trigger,
+      worlds: [{ worldId: 4030, alertId: 'a1', worldName: '利維坦' }],
+    }];
+    Modal.openBulkModal({ groups, nameMap, currentItemId: 44015, currentItemName: '木棉原木', alertCount: 1 });
+    const modal = document.querySelector('#univ-alert-modal');
+    modal.querySelector('[data-action="new-alert"]').click();
+    modal.querySelector('[data-action="save"]').click();
+    await new Promise(r => setTimeout(r, 10));
+
+    // executeSaveOps should have been called with deletes stripped
+    const opsArg = SaveOps.executeSaveOps.mock.calls[0][0];
+    expect(opsArg.postsNeeded).toHaveLength(1);
+    expect(opsArg.deletesAfterSuccess).toHaveLength(0);
   });
 });
 
@@ -221,7 +280,7 @@ describe('openBulkModal — item name resolution after save', () => {
       trigger: { filters: [], mapper: 'pricePerUnit', reducer: 'min', comparison: { lt: { target: 100 } } },
     };
     API.getAlerts.mockResolvedValue([updatedAlert]);
-    SaveOps.computeSaveOps.mockReturnValue({ postsNeeded: [], deletesAfterSuccess: [] });
+    SaveOps.computeSaveOps.mockReturnValue({ postsNeeded: [{ worldId: 4030 }], deletesAfterSuccess: [] });
     SaveOps.executeSaveOps.mockResolvedValue();
 
     // Open modal with empty currentItemName (h1 not rendered yet)

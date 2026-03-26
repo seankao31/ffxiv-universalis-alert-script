@@ -41,6 +41,15 @@ const Modal = (() => {
     return trigger.filters.includes('hq') ? `${label} <span style="background:#4a8a4a;border-radius:3px;padding:0 4px;font-size:11px">HQ</span>` : label;
   }
 
+  function formatRuleText(trigger) {
+    const comparator = 'lt' in trigger.comparison ? '<' : '>';
+    const target = trigger.comparison[Object.keys(trigger.comparison)[0]].target;
+    const metricLabels = { pricePerUnit: 'Price', quantity: 'Quantity', total: 'Total' };
+    const reducerLabels = { min: 'Min', max: 'Max', mean: 'Avg' };
+    const label = `${reducerLabels[trigger.reducer] || trigger.reducer} ${metricLabels[trigger.mapper] || trigger.mapper} ${comparator} ${target}`;
+    return trigger.filters.includes('hq') ? `${label} HQ` : label;
+  }
+
   function renderFormView(container, { itemId, itemName, group, onSave, onBack }) {
     const existingWorldIds = new Set((group?.worlds || []).map(w => w.worldId));
     const existingTrigger = group?.trigger || { filters: [], mapper: 'pricePerUnit', reducer: 'min', comparison: { lt: { target: 0 } } };
@@ -174,9 +183,9 @@ const Modal = (() => {
         statusEl.style.display = 'none';
         errorArea.textContent = err.message;
         errorArea.style.display = 'block';
-        // Capacity errors (validation) → "Save" so user can adjust worlds.
+        // Capacity/duplicate errors (validation) → "Save" so user can adjust.
         // Execution errors (API failure) → "Retry" to re-attempt the same operation.
-        saveBtn.textContent = err.isCapacityError ? 'Save' : 'Retry';
+        saveBtn.textContent = (err.isCapacityError || err.isDuplicateError) ? 'Save' : 'Retry';
         saveBtn.disabled = false;
       }
     });
@@ -304,18 +313,50 @@ const Modal = (() => {
         const freshGroups = _Grouping().groupAlerts(freshAlerts);
         freshGroups.forEach(g => {
           g.worlds = g.worlds.map(w => ({ ...w, worldName: _WorldMap.worldById(w.worldId)?.worldName || '' }));
+          g.worlds.sort((a, b) => a.worldName.localeCompare(b.worldName));
         });
 
         const normalizeTrigger = _Grouping().normalizeTrigger;
+        const isEditing = !!group;
         const originalTriggerKey = group ? normalizeTrigger(group.trigger) : null;
-        const freshGroup = originalTriggerKey
-          ? freshGroups.find(g => g.itemId === itemId && normalizeTrigger(g.trigger) === originalTriggerKey) || null
+        const formTriggerKey = normalizeTrigger(formState.trigger);
+
+        // When editing, match by original trigger to find the group even if the user
+        // changed the trigger. When creating new, match by form trigger for duplicate detection.
+        const matchKey = originalTriggerKey || formTriggerKey;
+        const freshGroup = matchKey
+          ? freshGroups.find(g => g.itemId === itemId && normalizeTrigger(g.trigger) === matchKey) || null
           : null;
 
+        // Pass freshGroup so computeSaveOps knows which worlds already have alerts.
         const ops = _SaveOps().computeSaveOps(freshGroup, formState, _WorldMap.WORLDS, freshAlerts.length);
+
+        // New alerts should only create, never delete existing alerts.
+        // Edits can delete (deselected worlds) and recreate (changed trigger/name).
+        if (!isEditing) {
+          ops.deletesAfterSuccess = [];
+          // Recompute capacity without deletes freeing slots
+          const maxAlerts = _SaveOps().MAX_ALERTS;
+          if (ops.postsNeeded.length > 0 && freshAlerts.length + ops.postsNeeded.length > maxAlerts) {
+            const available = maxAlerts - freshAlerts.length;
+            ops.capacityError = `Not enough alert slots (need ${ops.postsNeeded.length}, only ${available} available)`;
+          }
+        }
+
         if (ops.capacityError) {
           const err = new Error(ops.capacityError);
           err.isCapacityError = true;
+          throw err;
+        }
+
+        // Duplicate check: for new alerts, all selected worlds already covered.
+        // For edits, nothing changed.
+        if (ops.postsNeeded.length === 0 && ops.deletesAfterSuccess.length === 0) {
+          const label = nameMap.get(itemId) || formState.name || `Item #${itemId}`;
+          const rule = formatRuleText(formState.trigger);
+          const msg = isEditing ? 'No changes to save' : `Alert "${label}" (${rule}) already exists`;
+          const err = new Error(msg);
+          err.isDuplicateError = true;
           throw err;
         }
         const availableSlots = _SaveOps().MAX_ALERTS - freshAlerts.length;
@@ -325,6 +366,7 @@ const Modal = (() => {
         const updatedGroups = _Grouping().groupAlerts(updatedAlerts);
         updatedGroups.forEach(g => {
           g.worlds = g.worlds.map(w => ({ ...w, worldName: _WorldMap.worldById(w.worldId)?.worldName || '' }));
+          g.worlds.sort((a, b) => a.worldName.localeCompare(b.worldName));
         });
 
         // Re-read <h1> for current page item — it may not have been rendered

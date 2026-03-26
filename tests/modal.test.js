@@ -105,7 +105,7 @@ describe('openBulkModal — save progress', () => {
   test('shows status element and updates button text during save', async () => {
     GM_getValue.mockReturnValue('https://wh.com');
     API.getAlerts.mockResolvedValue([]);
-    SaveOps.computeSaveOps.mockReturnValue({ postsNeeded: [], deletesAfterSuccess: [] });
+    SaveOps.computeSaveOps.mockReturnValue({ postsNeeded: [{ worldId: 4028 }], deletesAfterSuccess: [] });
     SaveOps.executeSaveOps.mockReturnValue(new Promise(() => {})); // never resolves — keeps modal open
 
     Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item', alertCount: 0 });
@@ -151,7 +151,7 @@ describe('openBulkModal — save progress', () => {
   test('hides status and restores button on save error', async () => {
     GM_getValue.mockReturnValue('https://wh.com');
     API.getAlerts.mockResolvedValue([]);
-    SaveOps.computeSaveOps.mockReturnValue({ postsNeeded: [], deletesAfterSuccess: [] });
+    SaveOps.computeSaveOps.mockReturnValue({ postsNeeded: [{ worldId: 4028 }], deletesAfterSuccess: [] });
     SaveOps.executeSaveOps.mockRejectedValue(new Error('Save failed'));
 
     Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item', alertCount: 0 });
@@ -641,7 +641,7 @@ describe('renderFormView — Save builds trigger from form and saves webhook', (
   test('SaveOps.computeSaveOps receives trigger built from form fields', async () => {
     GM_getValue.mockReturnValue('https://wh.com');
     API.getAlerts.mockResolvedValue([]);
-    SaveOps.computeSaveOps.mockReturnValue({ postsNeeded: [], deletesAfterSuccess: [] });
+    SaveOps.computeSaveOps.mockReturnValue({ postsNeeded: [{ worldId: 4028 }], deletesAfterSuccess: [] });
     SaveOps.executeSaveOps.mockResolvedValue();
     API.getAlerts.mockResolvedValue([]); // called again after save
 
@@ -669,7 +669,7 @@ describe('renderFormView — Save builds trigger from form and saves webhook', (
   test('SaveOps.computeSaveOps receives alert name and selected world IDs', async () => {
     GM_getValue.mockReturnValue('https://wh.com');
     API.getAlerts.mockResolvedValue([]);
-    SaveOps.computeSaveOps.mockReturnValue({ postsNeeded: [], deletesAfterSuccess: [] });
+    SaveOps.computeSaveOps.mockReturnValue({ postsNeeded: [{ worldId: 4028 }], deletesAfterSuccess: [] });
     SaveOps.executeSaveOps.mockResolvedValue();
 
     Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item', alertCount: 0 });
@@ -691,7 +691,7 @@ describe('renderFormView — Save builds trigger from form and saves webhook', (
   test('GM_setValue is called with the webhook on save', async () => {
     GM_getValue.mockReturnValue('https://wh.com');
     API.getAlerts.mockResolvedValue([]);
-    SaveOps.computeSaveOps.mockReturnValue({ postsNeeded: [], deletesAfterSuccess: [] });
+    SaveOps.computeSaveOps.mockReturnValue({ postsNeeded: [{ worldId: 4028 }], deletesAfterSuccess: [] });
     SaveOps.executeSaveOps.mockResolvedValue();
 
     Modal.openBulkModal({ groups: [], nameMap: new Map([[44015, 'Item']]), currentItemId: 44015, currentItemName: 'Item', alertCount: 0 });
@@ -707,7 +707,7 @@ describe('renderFormView — removing progress phase', () => {
   test('displays removing phase message correctly', async () => {
     GM_getValue.mockReturnValue('https://wh.com');
     API.getAlerts.mockResolvedValue([]);
-    SaveOps.computeSaveOps.mockReturnValue({ postsNeeded: [], deletesAfterSuccess: [] });
+    SaveOps.computeSaveOps.mockReturnValue({ postsNeeded: [{ worldId: 4028 }], deletesAfterSuccess: [] });
     SaveOps.executeSaveOps.mockImplementation(async (ops, itemId, formState, { onProgress }) => {
       onProgress({ phase: 'removing', completed: 1, total: 2 });
       return new Promise(() => {}); // never resolves — keeps modal open
