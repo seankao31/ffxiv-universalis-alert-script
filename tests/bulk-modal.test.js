@@ -53,24 +53,23 @@ describe('openBulkModal — navigation', () => {
     const modal = document.querySelector('#univ-alert-modal');
     modal.querySelector('[data-action="new-alert"]').click();
     expect(modal.querySelector('[data-field="name"]')).not.toBeNull();
-    expect(modal.querySelector('[data-action="back"]')).not.toBeNull();
   });
 
-  test('"← Back to alerts" navigates from form to list', () => {
+  test('Cancel navigates from form back to list when opened from list', () => {
     Modal.openBulkModal({ groups, nameMap, currentItemId: 44015, currentItemName: '木棉原木', alertCount: 0 });
     const modal = document.querySelector('#univ-alert-modal');
     modal.querySelector('[data-action="new-alert"]').click();
-    modal.querySelector('[data-action="back"]').click();
+    modal.querySelector('[data-action="cancel"]').click();
     expect(modal.querySelector('[data-action="new-alert"]')).not.toBeNull();
     expect(modal.querySelector('[data-field="name"]')).toBeNull();
   });
 
-  test('"← Back to alerts" preserves capacity display', () => {
+  test('Cancel preserves capacity display when returning to list', () => {
     Modal.openBulkModal({ groups, nameMap, currentItemId: 44015, currentItemName: '木棉原木', alertCount: 12 });
     const modal = document.querySelector('#univ-alert-modal');
     expect(modal.textContent).toContain('Alert slots: 12 / 40 used');
     modal.querySelector('[data-action="new-alert"]').click();
-    modal.querySelector('[data-action="back"]').click();
+    modal.querySelector('[data-action="cancel"]').click();
     expect(modal.textContent).toContain('Alert slots: 12 / 40 used');
   });
 
@@ -80,7 +79,6 @@ describe('openBulkModal — navigation', () => {
     modal.querySelector('[data-action="edit"]').click();
     const nameInput = modal.querySelector('[data-field="name"]');
     expect(nameInput.value).toBe('Alert');
-    expect(modal.querySelector('[data-action="back"]')).not.toBeNull();
   });
 
   test('Edit resolves itemId/itemName from the group via nameMap', () => {
@@ -147,7 +145,7 @@ describe('openBulkModal — no duplicate deletes after navigation', () => {
     Modal.openBulkModal({ groups, nameMap, currentItemId: 44015, currentItemName: '木棉原木', alertCount: 0 });
     const modal = document.querySelector('#univ-alert-modal');
     modal.querySelector('[data-action="new-alert"]').click();
-    modal.querySelector('[data-action="back"]').click();
+    modal.querySelector('[data-action="cancel"]').click();
     modal.querySelector('[data-action="delete"]').click();
     await new Promise(r => setTimeout(r, 0));
     expect(API.deleteAlert).toHaveBeenCalledTimes(1);
@@ -360,7 +358,9 @@ describe('openBulkModal — delete last group', () => {
     modal.querySelector('[data-action="delete"]').click();
     await new Promise(r => setTimeout(r, 0));
     expect(modal.querySelector('[data-field="name"]')).not.toBeNull();
-    expect(modal.querySelector('[data-action="back"]')).toBeNull();
+    // Cancel closes modal when there's no list to return to
+    modal.querySelector('[data-action="cancel"]').click();
+    expect(document.querySelector('#univ-alert-modal')).toBeNull();
   });
 
   test('shows empty state when last group deleted and no currentItemId', async () => {

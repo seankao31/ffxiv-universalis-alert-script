@@ -72,12 +72,7 @@ const Modal = (() => {
       </label>`;
     }).join('');
 
-    const backLink = onBack
-      ? `<a href="#" data-action="back" style="color:#aaa;font-size:13px;text-decoration:none;display:inline-block;margin-bottom:12px">\u2190 Back to alerts</a>`
-      : '';
-
     container.innerHTML = `
-        ${backLink}
         <h3 style="margin:0 0 16px">Set Alerts \u2014 ${escHtml(itemName)}</h3>
         <form id="univ-alert-form">
           <div style="margin-bottom:12px">
@@ -142,14 +137,7 @@ const Modal = (() => {
     container.querySelector('[data-action="clear-all"]').addEventListener('click', () => {
       container.querySelectorAll('input[data-world-id]').forEach(cb => { cb.checked = false; });
     });
-    container.querySelector('[data-action="cancel"]').addEventListener('click', closeModal);
-
-    if (onBack) {
-      container.querySelector('[data-action="back"]').addEventListener('click', (e) => {
-        e.preventDefault();
-        onBack();
-      });
-    }
+    container.querySelector('[data-action="cancel"]').addEventListener('click', onBack || closeModal);
 
     saveBtn.addEventListener('click', async () => {
       saveBtn.disabled = true;
