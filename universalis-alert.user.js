@@ -608,7 +608,7 @@ const Modal = (() => {
         <span data-action="close" style="cursor:pointer;color:#888;font-size:18px">\u2715</span>
       </div>
       ${capacityLine}
-      <div data-list-area style="max-height:300px;overflow-y:auto">${rows}</div>
+      <div data-list-area style="max-height:500px;overflow-y:auto">${rows}</div>
       <div style="border-top:1px solid #333;margin-top:12px;padding-top:12px;text-align:center">
         <button data-action="new-alert" ${newAlertAttrs}>New Alert</button>
       </div>`;
@@ -641,7 +641,7 @@ const Modal = (() => {
     overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:9999';
 
     const innerContainer = document.createElement('div');
-    innerContainer.style.cssText = 'background:#1a1a2e;border-radius:8px;padding:24px;width:480px;max-height:80vh;overflow-y:auto;color:#fff';
+    innerContainer.style.cssText = 'background:#1a1a2e;border-radius:8px;padding:24px;width:600px;max-height:90vh;overflow-y:auto;color:#fff';
     overlay.appendChild(innerContainer);
     document.body.appendChild(overlay);
 
