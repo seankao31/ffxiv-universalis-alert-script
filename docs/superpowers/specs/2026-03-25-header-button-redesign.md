@@ -1,5 +1,7 @@
 # Header Button Redesign
 
+**Status:** Superseded by [2026-03-26-current-design.md](2026-03-26-current-design.md) — core design implemented, details evolved (fetchItemNames approach, skip handling, duplicate detection)
+
 Move the "Bulk Alerts" button from per-page injection into the global header. Remove the dedicated alerts page. The modal becomes the single interface for viewing and managing all alerts.
 
 ## Motivation

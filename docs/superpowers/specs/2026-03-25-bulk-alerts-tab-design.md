@@ -1,5 +1,7 @@
 # Bulk Alerts Tab — Design Spec
 
+**Status:** Superseded by [2026-03-25-header-button-redesign.md](2026-03-25-header-button-redesign.md) — approach abandoned in favor of global header button
+
 ## Summary
 
 Add a "Bulk Alerts" tab to the universalis.app account page navigation (alongside account, characters, lists, alerts) instead of replacing the existing alerts page. The tab navigates to `/account/bulk-alerts` and renders the alerts manager panel inside the existing page layout.

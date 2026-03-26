@@ -1,5 +1,7 @@
 # Alert Capacity Management
 
+**Status:** Superseded by [2026-03-26-current-design.md](2026-03-26-current-design.md) — fully implemented
+
 Universalis enforces a 40-alert-per-account limit. Alerts on different servers count separately, so monitoring 8 worlds for one item consumes 8 slots. This design adds capacity awareness to the bulk alerts modal.
 
 ## Goals

@@ -1,7 +1,7 @@
 # Universalis Alert Manager — TamperMonkey Script Design
 
 **Date:** 2026-03-23
-**Status:** Approved
+**Status:** Superseded by [2026-03-26-current-design.md](2026-03-26-current-design.md)
 
 ## Problem
 

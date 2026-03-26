@@ -1,5 +1,7 @@
 # Bulk Alerts Modal — Design Spec
 
+**Status:** Superseded by [2026-03-26-current-design.md](2026-03-26-current-design.md) — modal evolved during header button redesign
+
 ## Overview
 
 Transform the market page's "Set Alerts" button into a "Bulk Alerts" button that opens a full alert management modal for the current item. The modal supports viewing, creating, editing, and deleting alerts — bringing core Alerts page functionality to individual market pages.

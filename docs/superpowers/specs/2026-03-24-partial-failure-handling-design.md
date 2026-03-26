@@ -1,7 +1,7 @@
 # Partial Failure Handling — Design
 
 **Date:** 2026-03-24
-**Status:** Approved
+**Status:** Superseded by [2026-03-26-current-design.md](2026-03-26-current-design.md) — all fixes implemented
 
 ## Problem
 
