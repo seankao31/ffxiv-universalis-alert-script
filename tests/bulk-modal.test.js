@@ -378,3 +378,33 @@ describe('openBulkModal — delete last group', () => {
     expect(modal.textContent).toContain('No alerts yet');
   });
 });
+
+describe('openBulkModal — attribution footer', () => {
+  test('list view shows attribution text', () => {
+    const groups = [{
+      itemId: 44015, name: 'Alert', discordWebhook: 'https://wh.com', trigger,
+      worlds: [{ worldId: 4030, alertId: 'a1', worldName: '利維坦' }],
+    }];
+    Modal.openBulkModal({ groups, nameMap, currentItemId: 44015, currentItemName: '木棉原木', alertCount: 0 });
+    const modal = document.querySelector('#univ-alert-modal');
+    const attr = modal.querySelector('[data-attribution]');
+    expect(attr).not.toBeNull();
+    expect(attr.textContent).toContain('Made with');
+    expect(attr.textContent).toContain('Yshan');
+  });
+
+  test('empty state shows attribution text', () => {
+    Modal.openBulkModal({ groups: [], nameMap, currentItemId: null, currentItemName: null, alertCount: 0 });
+    const modal = document.querySelector('#univ-alert-modal');
+    const attr = modal.querySelector('[data-attribution]');
+    expect(attr).not.toBeNull();
+    expect(attr.textContent).toContain('Made with');
+    expect(attr.textContent).toContain('Yshan');
+  });
+
+  test('form view does not show attribution', () => {
+    Modal.openBulkModal({ groups: [], nameMap, currentItemId: 44015, currentItemName: '木棉原木', alertCount: 0 });
+    const modal = document.querySelector('#univ-alert-modal');
+    expect(modal.querySelector('[data-attribution]')).toBeNull();
+  });
+});
