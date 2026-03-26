@@ -133,7 +133,7 @@ const HeaderButton = (() => {
     const groups = _Grouping().groupAlerts(allAlerts);
     groups.forEach(g => {
       g.worlds = g.worlds.map(w => ({ ...w, worldName: _WorldMap().worldById(w.worldId)?.worldName || '' }));
-      g.worlds.sort((a, b) => a.worldName.localeCompare(b.worldName));
+      g.worlds.sort((a, b) => a.worldId - b.worldId);
     });
 
     _Modal().openBulkModal({ groups, nameMap, currentItemId, currentItemName, alertCount: allAlerts.length });

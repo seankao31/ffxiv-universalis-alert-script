@@ -713,7 +713,7 @@ const Modal = (() => {
         const freshGroups = _Grouping().groupAlerts(freshAlerts);
         freshGroups.forEach(g => {
           g.worlds = g.worlds.map(w => ({ ...w, worldName: _WorldMap.worldById(w.worldId)?.worldName || '' }));
-          g.worlds.sort((a, b) => a.worldName.localeCompare(b.worldName));
+          g.worlds.sort((a, b) => a.worldId - b.worldId);
         });
 
         const normalizeTrigger = _Grouping().normalizeTrigger;
@@ -773,7 +773,7 @@ const Modal = (() => {
         const updatedGroups = _Grouping().groupAlerts(updatedAlerts);
         updatedGroups.forEach(g => {
           g.worlds = g.worlds.map(w => ({ ...w, worldName: _WorldMap.worldById(w.worldId)?.worldName || '' }));
-          g.worlds.sort((a, b) => a.worldName.localeCompare(b.worldName));
+          g.worlds.sort((a, b) => a.worldId - b.worldId);
         });
 
         // Re-read <h1> for current page item — it may not have been rendered
@@ -998,7 +998,7 @@ const HeaderButton = (() => {
     const groups = _Grouping().groupAlerts(allAlerts);
     groups.forEach(g => {
       g.worlds = g.worlds.map(w => ({ ...w, worldName: _WorldMap().worldById(w.worldId)?.worldName || '' }));
-      g.worlds.sort((a, b) => a.worldName.localeCompare(b.worldName));
+      g.worlds.sort((a, b) => a.worldId - b.worldId);
     });
 
     _Modal().openBulkModal({ groups, nameMap, currentItemId, currentItemName, alertCount: allAlerts.length });
