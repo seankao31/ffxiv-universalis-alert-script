@@ -2,14 +2,14 @@
 
 ## Project Overview
 
-TamperMonkey userscript for bulk-managing market alerts on universalis.app, targeting the 陸行鳥 (Chocobo) data center. Source is split into modules under `src/`, concatenated into a single `.user.js` by `node build.js`.
+TamperMonkey userscript for bulk-managing market alerts on universalis.app, targeting the 陸行鳥 (Chocobo) data center. Source is split into modules under `src/`, concatenated into a single `.user.js` by `bun run build.js`.
 
 ## Commands
 
 ```bash
-npx jest --no-coverage          # run all tests
-npx jest --no-coverage tests/save-ops.test.js  # run one suite
-node build.js                   # build universalis-alert.user.js
+bunx jest --no-coverage          # run all tests
+bunx jest --no-coverage tests/save-ops.test.js  # run one suite
+bun run build.js                 # build universalis-alert.user.js
 ```
 
 ## Architecture

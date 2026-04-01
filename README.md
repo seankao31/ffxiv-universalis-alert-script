@@ -39,33 +39,32 @@ tests/             Jest tests (jsdom environment)
 build.js           Concatenates src/ into the userscript
 ```
 
-`node build.js` concatenates the source files in dependency order into `universalis-alert.user.js`.
+`bun run build.js` concatenates the source files in dependency order into `universalis-alert.user.js`.
 
 ## Development
 
 ### Prerequisites
 
-- Node.js (for tests and build)
-- npm or bun
+- [Bun](https://bun.sh/) (for tests and build)
 
 ### Setup
 
 ```bash
-npm install
+bun install
 ```
 
 ### Tests
 
 ```bash
-npx jest              # run all tests
-npx jest --watch      # re-run on file changes
-npx jest --no-coverage tests/save-ops.test.js  # run a single suite
+bunx jest              # run all tests
+bunx jest --watch      # re-run on file changes
+bunx jest --no-coverage tests/save-ops.test.js  # run a single suite
 ```
 
 ### Build
 
 ```bash
-node build.js
+bun run build.js
 ```
 
 This produces `universalis-alert.user.js` in the project root.
@@ -91,6 +90,6 @@ TamperMonkey can load a userscript directly from your filesystem, so you don't n
 // ==/UserScript==
 ```
 
-4. After running `node build.js`, refresh the page to pick up changes — no need to touch TamperMonkey
+4. After running `bun run build.js`, refresh the page to pick up changes — no need to touch TamperMonkey
 
 > **Note:** The `file://` `@require` path must be an absolute path. On macOS this looks like `file:///Users/you/project/universalis-alert.user.js`. On Windows: `file:///C:/Users/you/project/universalis-alert.user.js`.

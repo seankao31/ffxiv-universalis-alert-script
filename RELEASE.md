@@ -15,7 +15,7 @@ Users with the script installed receive auto-updates via TamperMonkey/Violentmon
 1. Bump `@version` in `src/header.js`
 2. Build and commit:
    ```bash
-   node build.js
+   bun run build.js
    git add src/header.js universalis-alert.user.js
    git commit -m "release: v0.2.0"
    ```
