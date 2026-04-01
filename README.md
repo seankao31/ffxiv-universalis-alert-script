@@ -13,6 +13,16 @@ Currently hardcoded to the **陸行鳥 (繁中服)** data center.
 
 The script auto-updates when a new version is released.
 
+## Alert Setup Instruction
+Please refer to this [guide](https://github.com/Universalis-FFXIV/guides/wiki/How-to-setup-Universalis-Alerts#setup-instructions) for instructions to setup Universalis alerts.
+1. Create a Discord Webhook:
+Create a webhook on a Discord channel you manage or have admin permissions over. Check out the [Discord documentation for setting up webhooks](https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks) if you need assistance.
+2. Login to Universalis with Discord
+3. Navigate to an item page
+4. Select the "Bulk Alerts" button
+   ![Bulk Alerts button in header](https://github.com/user-attachments/assets/dc351b26-2956-49ce-91b9-98eafb14d5c0)
+
+
 ## Features
 
 - **Bulk Alerts button** — persistent header button on every page opens a modal to create, edit, and delete alerts for all 8 worlds at once
