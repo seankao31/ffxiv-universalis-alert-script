@@ -610,7 +610,7 @@ const Modal = (() => {
       <div style="margin-top:12px;text-align:center">
         <button data-action="new-alert" ${newAlertAttrs}>New Alert</button>
       </div>
-      <div data-attribution style="border-top:1px solid #333;margin-top:32px;padding-top:12px;text-align:center;color:#555;font-size:11px">Made with \u2665 by Yshan</div>
+      <div data-attribution style="border-top:1px solid #333;margin-top:32px;padding-top:12px;text-align:center;color:#555;font-size:11px">Made with \u2665 by <a href="https://yhkao.com" target="_blank" rel="noopener" style="color:#555;text-decoration:underline">Yshan</a></div>
       <div data-kofi-container style="text-align:center;margin-top:6px"></div>`;
 
     // Event delegation — remove stale listener from previous render to avoid duplicates.
@@ -659,7 +659,7 @@ const Modal = (() => {
           <span data-action="close-empty" style="cursor:pointer;color:#888;font-size:18px">\u2715</span>
         </div>
         <p style="color:#888;text-align:center;padding:24px 0">No alerts yet. Navigate to an item page to create one.</p>
-        <div data-attribution style="text-align:center;color:#555;font-size:11px;margin-top:20px">Made with \u2665 by Yshan</div>
+        <div data-attribution style="text-align:center;color:#555;font-size:11px;margin-top:20px">Made with \u2665 by <a href="https://yhkao.com" target="_blank" rel="noopener" style="color:#555;text-decoration:underline">Yshan</a></div>
       <div data-kofi-container style="text-align:center;margin-top:6px"></div>`;
       innerContainer.querySelector('[data-action="close-empty"]').addEventListener('click', () => closeModal());
       injectKofi(innerContainer);
