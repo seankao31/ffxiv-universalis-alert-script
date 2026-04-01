@@ -6,16 +6,21 @@ Currently hardcoded to the **陸行鳥 (Chocobo)** data center.
 
 ## Features
 
-- **Market page** (`/market/{itemId}`) — "Set Alerts" button opens a modal to create or edit alerts for all 8 worlds at once
-- **Alerts page** (`/account/alerts`) — replaces the native list with a grouped view showing item, rule, worlds, and edit/delete actions
-- **Partial failure recovery** — save and delete operations show per-world progress, name failed worlds in error messages, and support retry
+- **Bulk Alerts button** — persistent header button on every page opens a modal to create, edit, and delete alerts for all 8 worlds at once
+- **Grouped alert view** — alerts are grouped by item and rule, with world pills showing which worlds are covered
+- **Alert capacity tracking** — displays used/available alert slots and validates capacity before saving
+- **Partial failure recovery** — save and delete operations show per-world progress, surface skipped worlds, name failures, and support retry
+- **Interleaved batching** — POST/DELETE operations are batched to stay within capacity while minimising intermediate states
 - **Rate limiting** — requests are serialised with 200 ms spacing and automatic 429 retry with backoff
 
 ## Installation
 
-1. Install [TamperMonkey](https://www.tampermonkey.net/) in your browser
-2. Create a new userscript and paste the contents of `universalis-alert.user.js`
-3. Navigate to any market page or the alerts page on universalis.app
+1. Install [TamperMonkey](https://www.tampermonkey.net/) or [Violentmonkey](https://violentmonkey.github.io/) in your browser
+2. **Chrome users:** enable Developer Mode in `chrome://extensions` and enable user scripts in TamperMonkey ([details](https://www.tampermonkey.net/faq.php?q=Q209))
+3. **[Click here to install](https://raw.githubusercontent.com/seankao31/ffxiv-universalis-alert-script/release/universalis-alert.user.js)** — your script manager will prompt you to confirm
+4. Navigate to any page on universalis.app — the **Bulk Alerts** button appears in the header
+
+The script auto-updates when a new version is released.
 
 ## Project Structure
 
@@ -26,11 +31,10 @@ src/
   grouping.js      Groups flat alerts into logical alert groups
   rate-limit.js    Sequential request queue with 429 retry
   api.js           GET/POST/DELETE wrappers for /api/web/alerts
-  save-ops.js      Computes and executes save operations (POST-first safety)
-  modal.js         Shared create/edit modal component
-  market-page.js   Injection for /market/* pages
-  alerts-page.js   Injection for /account/alerts
-  init.js          Entry point — detects current page and initialises
+  save-ops.js      Computes and executes save operations (interleaved batching)
+  modal.js         Alert modal — list view, form view, capacity display
+  header-button.js Injects Bulk Alerts button into site header, manages modal lifecycle
+  init.js          Entry point — initialises header button and navigation observer
 tests/             Jest tests (jsdom environment)
 build.js           Concatenates src/ into the userscript
 ```
@@ -79,10 +83,10 @@ TamperMonkey can load a userscript directly from your filesystem, so you don't n
 // @name         Universalis Alert Manager (Dev)
 // @namespace    https://universalis.app/
 // @version      dev
-// @match        https://universalis.app/market/*
-// @match        https://universalis.app/account/alerts
+// @match        https://universalis.app/*
 // @grant        GM_getValue
 // @grant        GM_setValue
+// @require      https://storage.ko-fi.com/cdn/widget/Widget_2.js
 // @require      file:///path/to/your/project/universalis-alert.user.js
 // ==/UserScript==
 ```
