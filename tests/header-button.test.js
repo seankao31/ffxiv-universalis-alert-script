@@ -1,6 +1,6 @@
 const HeaderButton = require('../src/header-button');
 
-global.Modal = { openBulkModal: jest.fn(), closeModal: jest.fn() };
+global.Modal = { openBulkModal: jest.fn(), closeModal: jest.fn(), openErrorModal: jest.fn(), openLoadingModal: jest.fn() };
 global.API = { getAlerts: jest.fn() };
 global.Grouping = require('../src/grouping');
 global.WorldMap = require('../src/worldmap');
@@ -64,6 +64,21 @@ describe('handleClick', () => {
     id: 'a1', itemId: 44015, worldId: 4030, name: 'Alert', discordWebhook: 'https://wh.com', triggerVersion: 0,
     trigger: { filters: [], mapper: 'pricePerUnit', reducer: 'min', comparison: { lt: { target: 130 } } },
   };
+
+  test('shows loading modal immediately on click', async () => {
+    setupHeader();
+    let resolveAlerts;
+    API.getAlerts.mockImplementation(() => new Promise(r => { resolveAlerts = r; }));
+
+    const promise = HeaderButton.handleClick();
+
+    // Loading modal shown before getAlerts resolves
+    expect(Modal.openLoadingModal).toHaveBeenCalled();
+    expect(Modal.openBulkModal).not.toHaveBeenCalled();
+
+    resolveAlerts([]);
+    await promise;
+  });
 
   test('fetches alerts and item names, opens bulk modal', async () => {
     setupHeader();
@@ -184,18 +199,19 @@ describe('handleClick', () => {
     expect(callArgs.currentItemName).toBeNull();
   });
 
-  test('shows inline error when getAlerts fails', async () => {
+  test('opens error modal when getAlerts fails (loading shown first)', async () => {
     setupHeader();
     HeaderButton.injectButton();
     API.getAlerts.mockRejectedValue(new Error('Network error'));
 
     await HeaderButton.handleClick();
 
+    expect(Modal.openLoadingModal).toHaveBeenCalled();
     expect(fetch).not.toHaveBeenCalled();
     expect(Modal.openBulkModal).not.toHaveBeenCalled();
-    const errorEl = document.getElementById('univ-alert-error');
-    expect(errorEl).not.toBeNull();
-    expect(errorEl.textContent).toContain('Failed to load');
+    expect(Modal.openErrorModal).toHaveBeenCalledWith(
+      expect.stringContaining('universalis.app/account/alerts')
+    );
   });
 
   test('degrades gracefully when fetchItemNames fails', async () => {

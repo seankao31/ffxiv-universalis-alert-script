@@ -841,7 +841,74 @@ const Modal = (() => {
     }
   }
 
-  return { closeModal, formatRule, renderListView, handleListDelete, openBulkModal };
+  function openErrorModal(message) {
+    closeModal();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'univ-alert-modal';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:9999';
+
+    const inner = document.createElement('div');
+    inner.style.cssText = 'background:#1a1a2e;border-radius:8px;padding:24px;width:600px;max-height:90vh;overflow-y:auto;color:#fff';
+    inner.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <h3 style="margin:0;color:#fff">Bulk Alerts</h3>
+        <span data-action="close-error" style="cursor:pointer;color:#888;font-size:18px">\u2715</span>
+      </div>
+      <p style="color:#ff6b6b;text-align:center;padding:24px 0">${message}</p>
+      <div data-attribution style="text-align:center;color:#555;font-size:11px;margin-top:20px">Made with \u2665 by <a href="https://yhkao.com" target="_blank" rel="noopener" style="color:#555;text-decoration:underline">Yshan</a></div>
+      <div data-kofi-container style="text-align:center;margin-top:6px"></div>`;
+    inner.querySelector('[data-action="close-error"]').addEventListener('click', () => closeModal());
+
+    overlay.appendChild(inner);
+    document.body.appendChild(overlay);
+
+    const onKeydown = (e) => { if (e.key === 'Escape') closeModal(); };
+    document.addEventListener('keydown', onKeydown);
+    overlay._onKeydown = onKeydown;
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+
+    injectKofi(inner);
+  }
+
+  function openLoadingModal() {
+    closeModal();
+
+    // Inject @keyframes once
+    if (!document.getElementById('univ-spinner-style')) {
+      const style = document.createElement('style');
+      style.id = 'univ-spinner-style';
+      style.textContent = '@keyframes spin { to { transform: rotate(360deg) } }';
+      document.head.appendChild(style);
+    }
+
+    const overlay = document.createElement('div');
+    overlay.id = 'univ-alert-modal';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:9999';
+
+    const inner = document.createElement('div');
+    inner.style.cssText = 'background:#1a1a2e;border-radius:8px;padding:24px;width:600px;max-height:90vh;overflow-y:auto;color:#fff';
+    inner.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <h3 style="margin:0;color:#fff">Bulk Alerts</h3>
+        <span data-action="close-loading" style="cursor:pointer;color:#888;font-size:18px">\u2715</span>
+      </div>
+      <div style="text-align:center;padding:48px 0">
+        <div data-spinner style="display:inline-block;width:32px;height:32px;border:3px solid #444;border-top-color:#bc9df9;border-radius:50%;animation:spin 0.8s linear infinite"></div>
+        <p style="color:#888;margin-top:16px">Loading alerts\u2026</p>
+      </div>`;
+    inner.querySelector('[data-action="close-loading"]').addEventListener('click', () => closeModal());
+
+    overlay.appendChild(inner);
+    document.body.appendChild(overlay);
+
+    const onKeydown = (e) => { if (e.key === 'Escape') closeModal(); };
+    document.addEventListener('keydown', onKeydown);
+    overlay._onKeydown = onKeydown;
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+  }
+
+  return { closeModal, formatRule, renderListView, handleListDelete, openBulkModal, openErrorModal, openLoadingModal };
 })();
 
 if (typeof module !== 'undefined') module.exports = Modal;
@@ -957,20 +1024,13 @@ const HeaderButton = (() => {
   }
 
   async function handleClick() {
-    // Clear previous error
-    const prevError = document.getElementById('univ-alert-error');
-    if (prevError) prevError.remove();
+    _Modal().openLoadingModal();
 
     let allAlerts;
     try {
       allAlerts = await _API().getAlerts();
     } catch {
-      const errorEl = document.createElement('div');
-      errorEl.id = 'univ-alert-error';
-      errorEl.style.cssText = 'color:#ff6b6b;font-size:13px;margin-top:4px';
-      errorEl.textContent = 'Failed to load alerts \u2014 check your connection';
-      const btn = document.getElementById('univ-alert-btn');
-      if (btn) btn.insertAdjacentElement('afterend', errorEl);
+      _Modal().openErrorModal('Failed to load alerts \u2014 check if <a href="https://universalis.app/account/alerts" target="_blank" rel="noopener" style="color:#ff6b6b;text-decoration:underline">alerts</a> is working on Universalis');
       return;
     }
 

@@ -750,3 +750,81 @@ describe('renderListView — capacity display', () => {
     expect(container.textContent).toContain('Alert slots: 0 / 40 used');
   });
 });
+
+describe('openErrorModal', () => {
+  test('opens modal with error message', () => {
+    Modal.openErrorModal('Something went wrong');
+    const overlay = document.getElementById('univ-alert-modal');
+    expect(overlay).not.toBeNull();
+    expect(overlay.textContent).toContain('Bulk Alerts');
+    expect(overlay.textContent).toContain('Something went wrong');
+  });
+
+  test('error message is styled in red', () => {
+    Modal.openErrorModal('Network failure');
+    const p = document.querySelector('#univ-alert-modal p');
+    expect(p.style.color).toBe('rgb(255, 107, 107)');
+  });
+
+  test('close button dismisses modal', () => {
+    Modal.openErrorModal('fail');
+    document.querySelector('[data-action="close-error"]').click();
+    expect(document.getElementById('univ-alert-modal')).toBeNull();
+  });
+
+  test('Escape key dismisses modal', () => {
+    Modal.openErrorModal('fail');
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(document.getElementById('univ-alert-modal')).toBeNull();
+  });
+
+  test('renders HTML links in message', () => {
+    Modal.openErrorModal('Check <a href="https://example.com">here</a>');
+    const link = document.querySelector('#univ-alert-modal p a');
+    expect(link).not.toBeNull();
+    expect(link.href).toBe('https://example.com/');
+    expect(link.textContent).toBe('here');
+  });
+});
+
+describe('openLoadingModal', () => {
+  test('opens modal with spinner and title', () => {
+    Modal.openLoadingModal();
+    const overlay = document.getElementById('univ-alert-modal');
+    expect(overlay).not.toBeNull();
+    expect(overlay.textContent).toContain('Bulk Alerts');
+    expect(overlay.querySelector('[data-spinner]')).not.toBeNull();
+  });
+
+  test('spinner has CSS animation', () => {
+    Modal.openLoadingModal();
+    const spinner = document.querySelector('#univ-alert-modal [data-spinner]');
+    expect(spinner.style.animation).toContain('spin');
+  });
+
+  test('close button dismisses modal', () => {
+    Modal.openLoadingModal();
+    document.querySelector('[data-action="close-loading"]').click();
+    expect(document.getElementById('univ-alert-modal')).toBeNull();
+  });
+
+  test('Escape key dismisses modal', () => {
+    Modal.openLoadingModal();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(document.getElementById('univ-alert-modal')).toBeNull();
+  });
+
+  test('is replaced when openBulkModal is called after', () => {
+    Modal.openLoadingModal();
+    expect(document.querySelector('#univ-alert-modal [data-spinner]')).not.toBeNull();
+    Modal.openBulkModal({ groups: [], nameMap: new Map(), currentItemId: null, currentItemName: null, alertCount: 0 });
+    expect(document.querySelector('#univ-alert-modal [data-spinner]')).toBeNull();
+  });
+
+  test('is replaced when openErrorModal is called after', () => {
+    Modal.openLoadingModal();
+    Modal.openErrorModal('Oops');
+    expect(document.querySelector('#univ-alert-modal [data-spinner]')).toBeNull();
+    expect(document.querySelector('#univ-alert-modal').textContent).toContain('Oops');
+  });
+});

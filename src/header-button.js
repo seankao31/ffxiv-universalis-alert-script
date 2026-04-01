@@ -107,20 +107,13 @@ const HeaderButton = (() => {
   }
 
   async function handleClick() {
-    // Clear previous error
-    const prevError = document.getElementById('univ-alert-error');
-    if (prevError) prevError.remove();
+    _Modal().openLoadingModal();
 
     let allAlerts;
     try {
       allAlerts = await _API().getAlerts();
     } catch {
-      const errorEl = document.createElement('div');
-      errorEl.id = 'univ-alert-error';
-      errorEl.style.cssText = 'color:#ff6b6b;font-size:13px;margin-top:4px';
-      errorEl.textContent = 'Failed to load alerts \u2014 check your connection';
-      const btn = document.getElementById('univ-alert-btn');
-      if (btn) btn.insertAdjacentElement('afterend', errorEl);
+      _Modal().openErrorModal('Failed to load alerts \u2014 check if <a href="https://universalis.app/account/alerts" target="_blank" rel="noopener" style="color:#ff6b6b;text-decoration:underline">alerts</a> is working on Universalis');
       return;
     }
 
