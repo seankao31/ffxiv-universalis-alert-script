@@ -4,8 +4,8 @@
 
 A GitHub Action (`.github/workflows/release.yml`) automates releases. When triggered, it:
 
-1. Builds `universalis-alert.user.js` from source
-2. Extracts the `==UserScript==` metadata block into `universalis-alert.meta.js`
+1. Builds `ffxiv-universalis-alert.user.js` from source
+2. Extracts the `==UserScript==` metadata block into `ffxiv-universalis-alert.meta.js`
 3. Force-pushes both files to an orphan `release` branch
 
 Users with the script installed receive auto-updates via TamperMonkey/Violentmonkey — their script manager checks `@updateURL` periodically and downloads the new version when `@version` changes.
@@ -16,7 +16,7 @@ Users with the script installed receive auto-updates via TamperMonkey/Violentmon
 2. Build and commit:
    ```bash
    bun run build.js
-   git add src/header.js universalis-alert.user.js
+   git add src/header.js ffxiv-universalis-alert.user.js
    git commit -m "release: v0.2.0"
    ```
 3. Tag and push:
@@ -35,7 +35,7 @@ You can also trigger the workflow from the GitHub Actions UI via **workflow_disp
 
 The `release` branch is an orphan branch containing only:
 
-- `universalis-alert.user.js` — the full built script (`@downloadURL`)
-- `universalis-alert.meta.js` — metadata-only header (`@updateURL`)
+- `ffxiv-universalis-alert.user.js` — the full built script (`@downloadURL`)
+- `ffxiv-universalis-alert.meta.js` — metadata-only header (`@updateURL`)
 
 Do not edit this branch manually — it is overwritten on every release.

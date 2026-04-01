@@ -13,7 +13,7 @@ const SRC_ORDER = [
   'src/init.js',
 ];
 
-const OUT = 'universalis-alert.user.js';
+const OUT = 'ffxiv-universalis-alert.user.js';
 
 const combined = SRC_ORDER.map(f => {
   const content = fs.readFileSync(path.join(__dirname, f), 'utf8');

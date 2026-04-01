@@ -9,7 +9,7 @@ TamperMonkey userscript for bulk-managing market alerts on universalis.app, targ
 ```bash
 bunx jest --no-coverage          # run all tests
 bunx jest --no-coverage tests/save-ops.test.js  # run one suite
-bun run build.js                 # build universalis-alert.user.js
+bun run build.js                 # build ffxiv-universalis-alert.user.js
 ```
 
 ## Architecture

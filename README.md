@@ -1,4 +1,4 @@
-# Universalis Alert Manager
+# FFXIV Universalis Alert Manager
 
 A TamperMonkey userscript for bulk-managing market alerts on [universalis.app](https://universalis.app/). Create, edit, and delete alerts across multiple worlds in a single operation instead of one-at-a-time through the native UI.
 
@@ -8,7 +8,7 @@ Currently hardcoded to the **陸行鳥 (繁中服)** data center.
 
 1. Install [TamperMonkey](https://www.tampermonkey.net/) or [Violentmonkey](https://violentmonkey.github.io/) in your browser
 2. **Chrome users:** enable Developer Mode in `chrome://extensions` and enable user scripts in TamperMonkey ([details](https://www.tampermonkey.net/faq.php?q=Q209))
-3. **[Click here to install](https://raw.githubusercontent.com/seankao31/ffxiv-universalis-alert-script/release/universalis-alert.user.js)** — your script manager will prompt you to confirm
+3. **[Click here to install](https://raw.githubusercontent.com/seankao31/ffxiv-universalis-alert-script/release/ffxiv-universalis-alert.user.js)** — your script manager will prompt you to confirm
 4. Navigate to any page on universalis.app — the **Bulk Alerts** button appears in the header
 
 The script auto-updates when a new version is released.
@@ -39,7 +39,7 @@ tests/             Jest tests (jsdom environment)
 build.js           Concatenates src/ into the userscript
 ```
 
-`bun run build.js` concatenates the source files in dependency order into `universalis-alert.user.js`.
+`bun run build.js` concatenates the source files in dependency order into `ffxiv-universalis-alert.user.js`.
 
 ## Development
 
@@ -67,7 +67,7 @@ bunx jest --no-coverage tests/save-ops.test.js  # run a single suite
 bun run build.js
 ```
 
-This produces `universalis-alert.user.js` in the project root.
+This produces `ffxiv-universalis-alert.user.js` in the project root.
 
 ### Local development with TamperMonkey
 
@@ -79,17 +79,17 @@ TamperMonkey can load a userscript directly from your filesystem, so you don't n
 
 ```js
 // ==UserScript==
-// @name         Universalis Alert Manager (Dev)
+// @name         FFXIV Universalis Alert Manager (Dev)
 // @namespace    https://universalis.app/
 // @version      dev
 // @match        https://universalis.app/*
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @require      https://storage.ko-fi.com/cdn/widget/Widget_2.js
-// @require      file:///path/to/your/project/universalis-alert.user.js
+// @require      file:///path/to/your/project/ffxiv-universalis-alert.user.js
 // ==/UserScript==
 ```
 
 4. After running `bun run build.js`, refresh the page to pick up changes — no need to touch TamperMonkey
 
-> **Note:** The `file://` `@require` path must be an absolute path. On macOS this looks like `file:///Users/you/project/universalis-alert.user.js`. On Windows: `file:///C:/Users/you/project/universalis-alert.user.js`.
+> **Note:** The `file://` `@require` path must be an absolute path. On macOS this looks like `file:///Users/you/project/ffxiv-universalis-alert.user.js`. On Windows: `file:///C:/Users/you/project/ffxiv-universalis-alert.user.js`.
