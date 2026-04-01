@@ -55,7 +55,15 @@ const HeaderButton = (() => {
     btn.addEventListener('mouseenter', () => { btn.style.background = '#a07de0'; });
     btn.addEventListener('mouseleave', () => { btn.style.background = '#bc9df9'; });
     btn.addEventListener('click', handleClick);
-    section.insertBefore(btn, section.firstChild);
+    const accountLink = section.querySelector('a[href="/account"]');
+    const accountDiv = accountLink ? accountLink.parentElement : null;
+    section.style.alignItems = 'center';
+    if (accountDiv) {
+      accountDiv.style.whiteSpace = 'nowrap';
+      accountDiv.insertBefore(btn, accountDiv.firstChild);
+    } else {
+      section.insertBefore(btn, section.firstChild);
+    }
   }
 
   async function fetchItemNames(itemIds) {
