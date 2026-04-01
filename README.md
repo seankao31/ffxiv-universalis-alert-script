@@ -2,16 +2,7 @@
 
 A TamperMonkey userscript for bulk-managing market alerts on [universalis.app](https://universalis.app/). Create, edit, and delete alerts across multiple worlds in a single operation instead of one-at-a-time through the native UI.
 
-Currently hardcoded to the **陸行鳥 (Chocobo)** data center.
-
-## Features
-
-- **Bulk Alerts button** — persistent header button on every page opens a modal to create, edit, and delete alerts for all 8 worlds at once
-- **Grouped alert view** — alerts are grouped by item and rule, with world pills showing which worlds are covered
-- **Alert capacity tracking** — displays used/available alert slots and validates capacity before saving
-- **Partial failure recovery** — save and delete operations show per-world progress, surface skipped worlds, name failures, and support retry
-- **Interleaved batching** — POST/DELETE operations are batched to stay within capacity while minimising intermediate states
-- **Rate limiting** — requests are serialised with 200 ms spacing and automatic 429 retry with backoff
+Currently hardcoded to the **陸行鳥 (繁中服)** data center.
 
 ## Installation
 
@@ -21,6 +12,15 @@ Currently hardcoded to the **陸行鳥 (Chocobo)** data center.
 4. Navigate to any page on universalis.app — the **Bulk Alerts** button appears in the header
 
 The script auto-updates when a new version is released.
+
+## Features
+
+- **Bulk Alerts button** — persistent header button on every page opens a modal to create, edit, and delete alerts for all 8 worlds at once
+- **Grouped alert view** — alerts are grouped by item and rule, with world pills showing which worlds are covered
+- **Alert capacity tracking** — displays used/available alert slots and validates capacity before saving
+- **Partial failure recovery** — save and delete operations show per-world progress, surface skipped worlds, name failures, and support retry
+- **Interleaved batching** — POST/DELETE operations are batched to stay within capacity while minimising intermediate states
+- **Rate limiting** — requests are serialised with 200 ms spacing and automatic 429 retry with backoff
 
 ## Project Structure
 
