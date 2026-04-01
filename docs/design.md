@@ -1,20 +1,18 @@
-# Universalis Alert Manager — Current Design
+# Universalis Alert Manager — Design
 
-**Date:** 2026-03-26
-**Status:** Current
-**Supersedes:** All previous design specs in this directory
+**Last updated:** 2026-03-26
 
 ---
 
 ## Overview
 
-TamperMonkey userscript that adds bulk alert management to [universalis.app](https://universalis.app). A persistent header button opens a modal for viewing, creating, editing, and deleting alerts across all items. Targets the 陸行鳥 (Chocobo) data center (8 worlds).
+TamperMonkey userscript that adds bulk alert management to [universalis.app](https://universalis.app). A persistent header button opens a modal for viewing, creating, editing, and deleting alerts across all items. Targets the 陸行鳥 (繁中服) data center (8 worlds).
 
 ---
 
 ## Architecture
 
-Source is split into modules under `src/`, concatenated into a single `.user.js` by `node build.js`. Build order is defined in `build.js:SRC_ORDER`.
+Source is split into modules under `src/`, concatenated into a single `.user.js` by `bun run build.js`. Build order is defined in `build.js:SRC_ORDER`.
 
 ### Module Pattern
 
@@ -169,7 +167,7 @@ The button lives in the site's global `<header>`, inside the account section. Fo
   <div>  <!-- header wrapper -->
     ...
     <div>  <!-- account section (direct child of wrapper, which is direct child of header) -->
-      <!-- "🔔 Bulk Alerts" button inserted here as firstChild -->
+      <!-- "Bulk Alerts" button inserted here as firstChild -->
       <div><a href="/account">帳號</a> ...</div>
       <div><button>⚙️</button></div>
     </div>
@@ -252,7 +250,6 @@ Fields:
 
 **Navigation:**
 - **Cancel** button: returns to List View if navigated from there (`onBack`); closes modal if opened directly into Form View
-- **"← Back to alerts"** link: not currently rendered (Cancel serves this purpose)
 
 **Save behavior:**
 - Save button shows "Saving..." while in progress
@@ -364,4 +361,3 @@ The observer also fires `route()` once immediately on script load.
 - Supporting multiple data centers (hardcoded to 陸行鳥)
 - Per-world different rules for the same item
 - Webhook URL format validation (non-empty string is sufficient)
-- Active/inactive tab styling on the native account page nav
