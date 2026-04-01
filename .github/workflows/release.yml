@@ -29,9 +29,15 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
+          # Stash built files before wiping the working tree
+          cp universalis-alert.user.js /tmp/universalis-alert.user.js
+          cp universalis-alert.meta.js /tmp/universalis-alert.meta.js
+
           # Create an orphan branch with only the two release files
           git checkout --orphan release-tmp
           git rm -rf .
+          cp /tmp/universalis-alert.user.js universalis-alert.user.js
+          cp /tmp/universalis-alert.meta.js universalis-alert.meta.js
           git add universalis-alert.user.js universalis-alert.meta.js
           git commit -m "Release ${GITHUB_REF_NAME:-manual}"
 
