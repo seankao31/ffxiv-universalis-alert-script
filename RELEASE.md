@@ -12,20 +12,16 @@ Users with the script installed receive auto-updates via TamperMonkey/Violentmon
 
 ## Publishing a release
 
-1. Bump `@version` in `src/header.js`
-2. Build and commit:
-   ```bash
-   bun run build.js
-   git add src/header.js ffxiv-universalis-alert.user.js
-   git commit -m "release: v0.2.0"
-   ```
-3. Tag and push:
-   ```bash
-   git tag v0.2.0
-   git push origin main --tags
-   ```
+Run `release.sh` with a semver bump flag or an explicit version:
 
-The action triggers on the tag push and deploys to the `release` branch automatically.
+```bash
+./release.sh -p        # patch: 0.1.1 → 0.1.2
+./release.sh -m        # minor: 0.1.1 → 0.2.0
+./release.sh -M        # major: 0.1.1 → 1.0.0
+./release.sh 0.5.0     # explicit version
+```
+
+The script bumps `@version` in `src/header.js`, rebuilds, commits, tags, and pushes. The GitHub Action triggers on the tag push and deploys to the `release` branch automatically.
 
 ## Manual trigger
 
