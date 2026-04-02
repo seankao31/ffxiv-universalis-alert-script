@@ -198,7 +198,7 @@ The button lives in the site's global `<header>`, inside the account section. Fo
 3. Detect page context: if on `/market/{id}`, read `currentItemId` and `currentItemName` from URL + `<h1>`
 4. Fetch item names for all unique `itemId`s in alerts (uses cache)
 5. Seed current page item name into `nameMap` if not already present
-6. Group alerts via `Grouping.groupAlerts`, enrich with world names from `WorldMap`, sort world pills alphabetically within each group
+6. Group alerts via `Grouping.groupAlerts`, enrich with world names from `WorldMap`, sort world pills by world ID within each group
 7. Open modal: `Modal.openBulkModal({ groups, nameMap, currentItemId, currentItemName, alertCount })`
 
 ---
