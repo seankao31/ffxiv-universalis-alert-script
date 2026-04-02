@@ -27,6 +27,32 @@ const Modal = (() => {
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
+  function createModalShell() {
+    closeModal();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'univ-alert-modal';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:9999';
+
+    const inner = document.createElement('div');
+    inner.style.cssText = 'background:#1a1a2e;border-radius:8px;padding:24px;width:600px;max-height:90vh;overflow-y:auto;color:#fff';
+    overlay.appendChild(inner);
+    document.body.appendChild(overlay);
+
+    const onKeydown = (e) => { if (e.key === 'Escape') closeModal(); };
+    document.addEventListener('keydown', onKeydown);
+    overlay._onKeydown = onKeydown;
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+
+    return { overlay, inner };
+  }
+
+  function attributionHtml(withBorder) {
+    const borderStyle = withBorder ? 'border-top:1px solid #333;margin-top:32px;padding-top:12px;' : 'margin-top:20px;';
+    return `<div data-attribution style="${borderStyle}text-align:center;color:#555;font-size:11px">Made with \u2665 by <a href="https://yhkao.com" target="_blank" rel="noopener" style="color:#555;text-decoration:underline">Yshan</a></div>
+      <div data-kofi-container style="text-align:center;margin-top:6px"></div>`;
+  }
+
   function worldPillHtml(w) {
     return `<span data-world-pill style="background:#1a3a5c;border-radius:12px;padding:2px 8px;font-size:12px;margin:2px;display:inline-block">${w.worldName || w.worldId}</span>`;
   }
@@ -250,8 +276,7 @@ const Modal = (() => {
       <div style="margin-top:12px;text-align:center">
         <button data-action="new-alert" ${newAlertAttrs}>New Alert</button>
       </div>
-      <div data-attribution style="border-top:1px solid #333;margin-top:32px;padding-top:12px;text-align:center;color:#555;font-size:11px">Made with \u2665 by <a href="https://yhkao.com" target="_blank" rel="noopener" style="color:#555;text-decoration:underline">Yshan</a></div>
-      <div data-kofi-container style="text-align:center;margin-top:6px"></div>`;
+      ${attributionHtml(true)}`;
 
     // Event delegation — remove stale listener from previous render to avoid duplicates.
     // innerHTML = '' only removes child nodes, not listeners on the container itself,
@@ -276,21 +301,7 @@ const Modal = (() => {
   }
 
   function openBulkModal({ groups, nameMap, currentItemId, currentItemName, alertCount }) {
-    closeModal();
-
-    const overlay = document.createElement('div');
-    overlay.id = 'univ-alert-modal';
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:9999';
-
-    const innerContainer = document.createElement('div');
-    innerContainer.style.cssText = 'background:#1a1a2e;border-radius:8px;padding:24px;width:600px;max-height:90vh;overflow-y:auto;color:#fff';
-    overlay.appendChild(innerContainer);
-    document.body.appendChild(overlay);
-
-    const onKeydown = (e) => { if (e.key === 'Escape') closeModal(); };
-    document.addEventListener('keydown', onKeydown);
-    overlay._onKeydown = onKeydown;
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+    const { overlay, inner: innerContainer } = createModalShell();
 
     function showEmptyState() {
       innerContainer.innerHTML = `
@@ -299,8 +310,7 @@ const Modal = (() => {
           <span data-action="close-empty" style="cursor:pointer;color:#888;font-size:18px">\u2715</span>
         </div>
         <p style="color:#888;text-align:center;padding:24px 0">No alerts yet. Navigate to an item page to create one.</p>
-        <div data-attribution style="text-align:center;color:#555;font-size:11px;margin-top:20px">Made with \u2665 by <a href="https://yhkao.com" target="_blank" rel="noopener" style="color:#555;text-decoration:underline">Yshan</a></div>
-      <div data-kofi-container style="text-align:center;margin-top:6px"></div>`;
+        ${attributionHtml(false)}`;
       innerContainer.querySelector('[data-action="close-empty"]').addEventListener('click', () => closeModal());
       injectKofi(innerContainer);
     }
@@ -482,38 +492,21 @@ const Modal = (() => {
   }
 
   function openErrorModal(message) {
-    closeModal();
+    const { overlay, inner } = createModalShell();
 
-    const overlay = document.createElement('div');
-    overlay.id = 'univ-alert-modal';
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:9999';
-
-    const inner = document.createElement('div');
-    inner.style.cssText = 'background:#1a1a2e;border-radius:8px;padding:24px;width:600px;max-height:90vh;overflow-y:auto;color:#fff';
     inner.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
         <h3 style="margin:0;color:#fff">Bulk Alerts</h3>
         <span data-action="close-error" style="cursor:pointer;color:#888;font-size:18px">\u2715</span>
       </div>
       <p style="color:#ff6b6b;text-align:center;padding:24px 0">${message}</p>
-      <div data-attribution style="text-align:center;color:#555;font-size:11px;margin-top:20px">Made with \u2665 by <a href="https://yhkao.com" target="_blank" rel="noopener" style="color:#555;text-decoration:underline">Yshan</a></div>
-      <div data-kofi-container style="text-align:center;margin-top:6px"></div>`;
+      ${attributionHtml(false)}`;
     inner.querySelector('[data-action="close-error"]').addEventListener('click', () => closeModal());
-
-    overlay.appendChild(inner);
-    document.body.appendChild(overlay);
-
-    const onKeydown = (e) => { if (e.key === 'Escape') closeModal(); };
-    document.addEventListener('keydown', onKeydown);
-    overlay._onKeydown = onKeydown;
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
 
     injectKofi(inner);
   }
 
   function openLoadingModal() {
-    closeModal();
-
     // Inject @keyframes once
     if (!document.getElementById('univ-spinner-style')) {
       const style = document.createElement('style');
@@ -522,12 +515,8 @@ const Modal = (() => {
       document.head.appendChild(style);
     }
 
-    const overlay = document.createElement('div');
-    overlay.id = 'univ-alert-modal';
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:9999';
+    const { overlay, inner } = createModalShell();
 
-    const inner = document.createElement('div');
-    inner.style.cssText = 'background:#1a1a2e;border-radius:8px;padding:24px;width:600px;max-height:90vh;overflow-y:auto;color:#fff';
     inner.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
         <h3 style="margin:0;color:#fff">Bulk Alerts</h3>
@@ -538,14 +527,6 @@ const Modal = (() => {
         <p style="color:#888;margin-top:16px">Loading alerts\u2026</p>
       </div>`;
     inner.querySelector('[data-action="close-loading"]').addEventListener('click', () => closeModal());
-
-    overlay.appendChild(inner);
-    document.body.appendChild(overlay);
-
-    const onKeydown = (e) => { if (e.key === 'Escape') closeModal(); };
-    document.addEventListener('keydown', onKeydown);
-    overlay._onKeydown = onKeydown;
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
   }
 
   return { closeModal, formatRule, renderListView, handleListDelete, openBulkModal, openErrorModal, openLoadingModal };
