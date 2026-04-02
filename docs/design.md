@@ -1,6 +1,6 @@
 # FFXIV Universalis Alert Manager — Design
 
-**Last updated:** 2026-03-26
+**Last updated:** 2026-04-02
 
 ---
 
@@ -193,8 +193,8 @@ The button lives in the site's global `<header>`, inside the account section. Fo
 
 ### Click Handler (`handleClick`)
 
-1. Clear any previous inline error
-2. `GET /api/web/alerts` — on failure, show inline error next to the button; modal does not open
+1. Open loading modal (`openLoadingModal`)
+2. `GET /api/web/alerts` — on failure, replace loading modal with error modal (`openErrorModal`); return
 3. Detect page context: if on `/market/{id}`, read `currentItemId` and `currentItemName` from URL + `<h1>`
 4. Fetch item names for all unique `itemId`s in alerts (uses cache)
 5. Seed current page item name into `nameMap` if not already present
