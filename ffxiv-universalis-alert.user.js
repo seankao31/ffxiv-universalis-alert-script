@@ -2,7 +2,7 @@
 // ==UserScript==
 // @name         FFXIV Universalis Alert Manager
 // @namespace    https://universalis.app/
-// @version      0.1.1
+// @version      0.1.2
 // @description  Multi-world bulk alert creation and management for Universalis
 // @author       Yshan
 // @homepage     https://yhkao.com
