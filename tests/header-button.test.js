@@ -34,9 +34,10 @@ describe('injectButton', () => {
     setupHeader();
     HeaderButton.injectButton();
     const btn = document.getElementById('univ-alert-btn');
-    // Button is first child of the account section (direct child of <header>)
-    expect(btn.parentElement.querySelector('a[href="/account"]')).not.toBeNull();
-    expect(btn.parentElement.parentElement.tagName).toBe('HEADER');
+    // Button is inside the account div (contains the account link), within the account section
+    const accountDiv = btn.parentElement;
+    expect(accountDiv.querySelector('a[href="/account"]')).not.toBeNull();
+    expect(accountDiv.parentElement.parentElement.tagName).toBe('HEADER');
   });
 
   test('button has correct text', () => {

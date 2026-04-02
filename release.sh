@@ -37,16 +37,20 @@ if git rev-parse "v$VERSION" >/dev/null 2>&1; then
   exit 1
 fi
 
-# Update version in header.js
+# Update version in header.js (sed -i '' is macOS/BSD syntax; works on GNU sed too)
 sed -i '' "s/^\/\/ @version      .*/\/\/ @version      $VERSION/" src/header.js
 echo "Updated src/header.js to $VERSION"
+
+# Sync version in package.json
+sed -i '' "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" package.json
+echo "Updated package.json to $VERSION"
 
 # Rebuild so the built file picks up the new version
 bun run build.js
 echo "Rebuilt ffxiv-universalis-alert.user.js"
 
 # Commit, tag, push
-git add src/header.js ffxiv-universalis-alert.user.js
+git add src/header.js package.json ffxiv-universalis-alert.user.js
 git commit -m "chore: bump version to $VERSION"
 git tag "v$VERSION"
 git push && git push --tags

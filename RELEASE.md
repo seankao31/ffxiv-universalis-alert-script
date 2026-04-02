@@ -21,7 +21,9 @@ Run `release.sh` with a semver bump flag or an explicit version:
 ./release.sh 0.5.0     # explicit version
 ```
 
-The script bumps `@version` in `src/header.js`, rebuilds, commits, tags, and pushes. The GitHub Action triggers on the tag push and deploys to the `release` branch automatically.
+The script bumps `@version` in `src/header.js` and `package.json`, rebuilds, commits, tags, and pushes. The GitHub Action triggers on the tag push and deploys to the `release` branch automatically.
+
+> **Note:** `release.sh` uses macOS/BSD `sed` syntax (`sed -i ''`). It works on GNU sed too, but was written for macOS.
 
 ## Manual trigger
 

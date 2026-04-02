@@ -164,18 +164,20 @@ The button lives in the site's global `<header>`, inside the account section. Fo
 
 ```html
 <header>
-  <div>  <!-- header wrapper -->
+  <div>  <!-- main wrapper -->
     ...
-    <div>  <!-- account section (direct child of wrapper, which is direct child of header) -->
+  </div>
+  <div>  <!-- account section (direct child of header) -->
+    <div>  <!-- account div -->
       <!-- "Bulk Alerts" button inserted here as firstChild -->
-      <div><a href="/account">帳號</a> ...</div>
-      <div><button>⚙️</button></div>
+      <a href="/account">帳號</a> ...
     </div>
+    <div><button>⚙️</button></div>
   </div>
 </header>
 ```
 
-- `injectButton()` creates the button with `id="univ-alert-btn"`, inserts as `firstChild` of the account section. Idempotent — no-ops if button already exists.
+- `injectButton()` creates the button with `id="univ-alert-btn"`, inserts as `firstChild` of the account div (the div containing the account link). `white-space:nowrap` prevents line-wrapping when the button is added. Idempotent — no-ops if button already exists.
 - `init()` attempts immediate injection, then sets up a `MutationObserver` on `document.body` to re-inject after React re-renders. Observer persists for the session lifetime.
 - On logged-out pages (no account section), injection is a no-op.
 
@@ -229,7 +231,7 @@ Header: "Bulk Alerts" with ✕ close button.
 **Rows:** Flat list sorted by `itemId` so same-item alerts cluster. Each row shows:
 - Item name + ID (resolved from `nameMap`, fallback `Item #ID`)
 - Formatted rule (e.g., "Min Price < 130" with HQ badge if applicable)
-- World pills (sorted alphabetically)
+- World pills (sorted by world ID)
 - Edit / Delete buttons
 
 **"New Alert" button:** Pinned below the scrollable list area.
