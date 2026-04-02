@@ -5,7 +5,7 @@
   "scripts": {
     "test": "jest",
     "test:watch": "jest --watch",
-    "build": "node build.js"
+    "build": "bun run build.js"
   },
   "devDependencies": {
     "jest": "^29.0.0",
