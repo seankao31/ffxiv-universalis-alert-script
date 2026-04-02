@@ -38,7 +38,7 @@ Modules reference dependencies in two ways:
 1. **Direct** (for modules with no circular risk): `const _Dep = typeof Dep !== 'undefined' ? Dep : require('./dep');`
 2. **Lazy function** (for page modules that cross-reference many deps): `function _API() { return typeof API !== 'undefined' ? API : _apiModule; }`
 
-MarketPage and AlertsPage use the lazy pattern. Other modules use direct resolution.
+Modal and HeaderButton use the lazy pattern. Other modules use direct resolution.
 
 ### Source Order
 
