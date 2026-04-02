@@ -203,6 +203,13 @@ describe('handleClick', () => {
   test('opens error modal when getAlerts fails (loading shown first)', async () => {
     setupHeader();
     HeaderButton.injectButton();
+    // openLoadingModal must create the real DOM element so handleClick sees the
+    // modal is still open and proceeds to show the error
+    Modal.openLoadingModal.mockImplementation(() => {
+      const el = document.createElement('div');
+      el.id = 'univ-alert-modal';
+      document.body.appendChild(el);
+    });
     API.getAlerts.mockRejectedValue(new Error('Network error'));
 
     await HeaderButton.handleClick();
@@ -211,8 +218,34 @@ describe('handleClick', () => {
     expect(fetch).not.toHaveBeenCalled();
     expect(Modal.openBulkModal).not.toHaveBeenCalled();
     expect(Modal.openErrorModal).toHaveBeenCalledWith(
-      expect.stringContaining('universalis.app/account/alerts')
+      expect.stringContaining('Universalis alerts API')
     );
+  });
+
+  test('silently ignores error when user closes modal before getAlerts responds', async () => {
+    setupHeader();
+    HeaderButton.injectButton();
+    // openLoadingModal creates the modal DOM element
+    Modal.openLoadingModal.mockImplementation(() => {
+      const el = document.createElement('div');
+      el.id = 'univ-alert-modal';
+      document.body.appendChild(el);
+    });
+
+    let rejectAlerts;
+    API.getAlerts.mockImplementation(() => new Promise((_, reject) => { rejectAlerts = reject; }));
+
+    const promise = HeaderButton.handleClick();
+
+    // User closes the modal while getAlerts is in flight
+    const modal = document.getElementById('univ-alert-modal');
+    modal.remove();
+
+    // Now the API responds with an error
+    rejectAlerts(new Error('Network error'));
+    await promise;
+
+    expect(Modal.openErrorModal).not.toHaveBeenCalled();
   });
 
   test('degrades gracefully when fetchItemNames fails', async () => {

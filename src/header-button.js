@@ -113,7 +113,9 @@ const HeaderButton = (() => {
     try {
       allAlerts = await _API().getAlerts();
     } catch {
-      _Modal().openErrorModal('Failed to load alerts \u2014 check if <a href="https://universalis.app/account/alerts" target="_blank" rel="noopener" style="color:#ff6b6b;text-decoration:underline">alerts</a> is working on Universalis');
+      // If user closed the loading modal while waiting, don't pop up the error
+      if (!document.getElementById('univ-alert-modal')) return;
+      _Modal().openErrorModal('Failed to load alerts \u2014 an error occurred with the Universalis alerts API');
       return;
     }
 
