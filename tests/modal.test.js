@@ -422,25 +422,9 @@ describe('list view — queued state', () => {
     expect(deleteBtn.style.opacity).toBe('0.7');
   });
 
-  test('opacity restores to 1 once delete progress begins', async () => {
-    API.deleteAlert.mockResolvedValue();
-    const groups = [{
-      itemId: 44015, name: 'Alert', discordWebhook: 'https://wh.com', trigger,
-      worlds: [{ worldId: 4030, alertId: 'a1', worldName: '利維坦' }],
-    }];
-    const container = document.createElement('div');
-    Modal.renderListView(container, { groups, nameMap: new Map([[44015, 'Item']]), onEdit: jest.fn(), onDelete: (group, idx, btn) => {
-      Modal.handleListDelete(group, idx, btn, container, jest.fn());
-    }, onNew: jest.fn(), onClose: jest.fn(), newAlertDisabled: false });
-
-    const deleteBtn = container.querySelector('[data-action="delete"]');
-    deleteBtn.click();
-    await new Promise(r => setTimeout(r, 0));
-
-    // After completion, row is removed — but opacity should have been set to '1' during progress
-    // Verify via a partial-failure scenario instead
-  });
-
+  // Opacity restore on the success path can't be asserted because the row is removed
+  // before the intermediate opacity='1' state is observable. The partial-failure test
+  // below covers the opacity restore logic.
   test('opacity restores on retry after partial failure', async () => {
     API.deleteAlert.mockRejectedValue(new Error('500'));
     const groups = [{
