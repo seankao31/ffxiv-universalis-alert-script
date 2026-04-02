@@ -5,7 +5,7 @@ const Modal = require('../src/modal');
 // Re-assign per test as needed
 beforeEach(() => {
   document.body.innerHTML = '';
-  jest.clearAllMocks();
+  jest.resetAllMocks();
   GM_getValue.mockReset();
   GM_setValue.mockReset();
 });
